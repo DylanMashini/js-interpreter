@@ -108,9 +108,19 @@ impl VariableDecleration {
 
 #[derive(Debug)]
 pub struct IfStmt {
-    condition: Box<Node>,
-    consequent: Box<Node>,
-    alternate: Option<Box<Node>>,
+    condition: Box<Expression>,
+    consequent: Box<Statement>,
+    alternate: Option<Box<Statement>>,
+}
+
+impl IfStmt {
+    pub fn new(condition: Box<Expression>, consequent: Box<Statement>, alternate: Option<Box<Statement>>) -> IfStmt {
+        IfStmt {
+            condition,
+            consequent,
+            alternate
+        }
+    }
 }
 
 #[derive(Debug)]

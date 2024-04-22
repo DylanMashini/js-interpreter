@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::ast::{BinOp, BinaryExpr, Expression, Program, Statement, UnOp, VariableDecleration, UnaryExpr, Literal};
+use crate::ast::{BinOp, BinaryExpr, Expression, IfStmt, Literal, Program, Statement, UnOp, UnaryExpr, VariableDecleration};
 use crate::lexer::Token;
 
 pub struct Parser {
@@ -20,20 +20,58 @@ impl Parser {
         let mut statements: Vec<Statement> = Vec::new();
 
         while !self.finished() {
-            statements.push(self.declaration())
+            if let Some(stmt) = self.statement() {
+                statements.push(stmt);
+            }
         }
         Program::new(statements)
     }
 
-    pub fn declaration(&mut self) -> Statement {
+
+    pub fn statement(&mut self) -> Option<Statement> {
         match self.peek() {
-            Token::Let => self.variable_declaration(),
-            _ => self.statement(),
+            Token::If => Some(self.if_statement()),
+            Token::LCurlyBracket => Some(self.block_statement()),
+            Token::Let => Some(self.variable_declaration()),
+            Token::EOL => {
+                self.consume(Token::EOL, "Token should be EOL");
+                None
+            },
+            _ => Some(Statement::ExpressionStmt(self.expression())),
         }
     }
 
-    pub fn statement(&mut self) -> Statement {
-        todo!();
+    pub fn if_statement(&mut self) -> Statement {
+        self.consume(Token::If, "If Statement Should Start with If");
+        self.consume(Token::LParentheses, "Expected LParentheses Before If Statement Condition");
+        let condition = Box::new(self.expression());
+        self.consume(Token::RParentheses, "Expected Closing Parentheses After If Statement Condition");
+
+        let consequent = Box::new(self.statement().expect("Must be statement after 'if'"));
+
+        let alternate = if self.match_token_consume(Token::Else).is_some() {
+            Some(Box::new(self.statement().expect("Must be statement after 'else'")))
+        } else {
+            None
+        };
+
+
+        Statement::IfStmt(IfStmt::new(condition, consequent, alternate))
+    }
+
+    pub fn block_statement(&mut self) -> Statement {
+        let mut statements: Vec<Statement> = Vec::new();
+        self.consume(Token::LCurlyBracket, "LCurlyBracket should open block statement");
+
+        while self.peek().clone() != Token::RCurlyBracket {
+            if let Some(stmt) = self.statement() {
+                statements.push(stmt);
+            }
+        }
+
+        self.consume(Token::RCurlyBracket, "Expected RCurlyBracket to close block statement");
+
+        Statement::BlockStmt(statements)
     }
 
     pub fn variable_declaration(&mut self) -> Statement {
@@ -44,8 +82,14 @@ impl Parser {
             } else {
                 None
             };
-            self.consume(Token::EOL, "Expect newline after variable declaration.");
-            Statement::VariableStmt(VariableDecleration::new(name, init))
+            if self.match_token_consume(Token::EOL).is_some() || self.match_token_consume(Token::Semicolon).is_some() {
+                // Handle both a semicolon and newline
+                self.match_token_consume(Token::EOL);
+                Statement::VariableStmt(VariableDecleration::new(name, init))
+            } else {
+                panic!("Parse Error at position {}\n Expected newline or semicolon after variable decleration. ", self.position);
+            }
+            
         } else {
             panic!("Parser error: Expected identifier after 'let'.");
         }

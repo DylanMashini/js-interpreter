@@ -35,6 +35,7 @@ pub enum Token {
     Minus,
     Multiply,
     Divide,
+    Semicolon,
     EOL,
 }
 
@@ -92,6 +93,7 @@ impl Lexer {
                             ')' => tokens.push(Token::RParentheses),
                             '.' => tokens.push(Token::Dot),
                             ',' => tokens.push(Token::Comma),
+                            ';' => tokens.push(Token::Semicolon),
                             '>' | '<' | '=' | '!' | '+' | '-' | '*' | '/'  => {
                                 current_token.push(c);
                                 self.state = State::InOperator
@@ -111,7 +113,7 @@ impl Lexer {
                             }
                         },
                         State::InIdentifier => match c {
-                            'a'..='z' | 'A'..='Z' | '0'..='9' | '=' => current_token.push(c),
+                            'a'..='z' | 'A'..='Z' | '0'..='9' => current_token.push(c),
                             _ => {
                                 match current_token.as_str() {
                                     "if" => tokens.push(Token::If),
@@ -163,6 +165,7 @@ impl Lexer {
                                     }
                                     current_token.clear();
                                     self.state = State::Normal;
+                                    continue;
                                 }
                             }
                         }
