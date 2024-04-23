@@ -1,9 +1,15 @@
 #![allow(dead_code)]
 
 use crate::ast::{
-    BinOp, BinaryExpr, CallExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program, Statement, UnOp, UnaryExpr, VariableDecleration, WhileStmt
+    BinOp, BinaryExpr, CallExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program,
+    Statement, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
 };
-use std::{cell::RefCell, collections::HashMap, rc::{Rc, Weak}, thread::scope};
+use core::fmt;
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    rc::{Rc, Weak},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 struct Function {
@@ -13,20 +19,29 @@ struct Function {
 
 impl Function {
     pub fn new(arguments: Vec<String>, body: Statement) -> Function {
-        Function {
-            arguments,
-            body
-        }
+        Function { arguments, body }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 enum Value {
     Number(f64),
     String(String),
     Boolean(bool),
     Function(Function),
     Null,
+}
+
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", match self {
+            Value::Number(val) => val.to_string(),
+            Value::String(val) => val.to_string(),
+            Value::Boolean(val) => val.to_string(),
+            Value::Function(_) => format!("Printing Functions Not Supported"),
+            Value::Null => "null".to_string(),
+        })
+    }
 }
 
 impl Value {
@@ -308,16 +323,16 @@ impl Enviorment {
     pub fn get_variable(&self, id: &String) -> Value {
         match self.variables.get(id) {
             Some(val) => val.clone(),
-            None => {
-                match &self.parent {
-                    Some(parent) => {
-                        let env = parent.upgrade().expect("Parents should always drop after child");
-                        let val = env.borrow().get_variable(id).clone();
-                        val
-                    },
-                    None => Value::Null
+            None => match &self.parent {
+                Some(parent) => {
+                    let env = parent
+                        .upgrade()
+                        .expect("Parents should always drop after child");
+                    let val = env.borrow().get_variable(id).clone();
+                    val
                 }
-            }
+                None => Value::Null,
+            },
         }
     }
 }
@@ -351,54 +366,82 @@ impl Runtime {
     }
     // Evaluates the next statement
     fn execute_statement(&self, statement: &Statement, scoped_enviorment: Rc<RefCell<Enviorment>>) {
-
         match statement {
             Statement::ExpressionStmt(expression) => {
                 self.evaluate_expression(expression, scoped_enviorment);
             }
-            Statement::VariableStmt(decleration) => self.declare_variable(decleration, scoped_enviorment),
+            Statement::VariableStmt(decleration) => {
+                self.declare_variable(decleration, scoped_enviorment)
+            }
             Statement::IfStmt(if_statement) => self.if_statement(if_statement, scoped_enviorment),
-            Statement::BlockStmt(block_statement) => self.block_statement(block_statement, scoped_enviorment),
-            Statement::FunctionDecleration(function_decleration) => self.declare_function(function_decleration, scoped_enviorment),
-            Statement::ReturnStatement(expression) => self.return_statement(expression, scoped_enviorment),
-            Statement::WhileStmt(while_statement) => self.while_statement(while_statement, scoped_enviorment),
-            Statement::ForStmt(for_statement) => self.for_statement(for_statement, scoped_enviorment),
+            Statement::BlockStmt(block_statement) => {
+                self.block_statement(block_statement, scoped_enviorment)
+            }
+            Statement::FunctionDecleration(function_decleration) => {
+                self.declare_function(function_decleration, scoped_enviorment)
+            }
+            Statement::ReturnStatement(expression) => {
+                self.return_statement(expression, scoped_enviorment)
+            }
+            Statement::WhileStmt(while_statement) => {
+                self.while_statement(while_statement, scoped_enviorment)
+            }
+            Statement::ForStmt(for_statement) => {
+                self.for_statement(for_statement, scoped_enviorment)
+            }
             _ => todo!(),
         };
-
     }
 
-    fn evaluate_expression(&self, expression: &Expression, scoped_enviorment: Rc<RefCell<Enviorment>>) -> Value {
+    fn evaluate_expression(
+        &self,
+        expression: &Expression,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) -> Value {
         let val = match expression {
-            Expression::BinaryExpr(BinExp) => self.evaluate_binary_expression(BinExp, scoped_enviorment),
-            Expression::UnaryExpr(UnExp) => self.evaluate_unary_expression(UnExp, scoped_enviorment),
+            Expression::BinaryExpr(BinExp) => {
+                self.evaluate_binary_expression(BinExp, scoped_enviorment)
+            }
+            Expression::UnaryExpr(UnExp) => {
+                self.evaluate_unary_expression(UnExp, scoped_enviorment)
+            }
             Expression::CallExpr(CallExp) => self.invoke_function(CallExp, scoped_enviorment),
             Expression::LiteralExpr(LitExp) => Value::from_literal(LitExp),
             Expression::Identifier(id) => self.evaluate_identifier(id, scoped_enviorment),
-            Expression::Increment(id) => self.evaluate_binary_expression(&BinaryExpr::new(
-                Box::new(Expression::Identifier(id.to_string())),
-                BinOp::Assign,
-                Box::new(Expression::BinaryExpr(BinaryExpr::new(
+            Expression::Increment(id) => self.evaluate_binary_expression(
+                &BinaryExpr::new(
                     Box::new(Expression::Identifier(id.to_string())),
-                    BinOp::Add,
-                    Box::new(Expression::LiteralExpr(Literal::Number(1.0))),
-                ))),
-            ),scoped_enviorment),
-            Expression::Decrement(id) => self.evaluate_binary_expression(&BinaryExpr::new(
-                Box::new(Expression::Identifier(id.to_string())),
-                BinOp::Assign,
-                Box::new(Expression::BinaryExpr(BinaryExpr::new(
+                    BinOp::Assign,
+                    Box::new(Expression::BinaryExpr(BinaryExpr::new(
+                        Box::new(Expression::Identifier(id.to_string())),
+                        BinOp::Add,
+                        Box::new(Expression::LiteralExpr(Literal::Number(1.0))),
+                    ))),
+                ),
+                scoped_enviorment,
+            ),
+            Expression::Decrement(id) => self.evaluate_binary_expression(
+                &BinaryExpr::new(
                     Box::new(Expression::Identifier(id.to_string())),
-                    BinOp::Subtract,
-                    Box::new(Expression::LiteralExpr(Literal::Number(1.0))),
-                ))),
-            ), scoped_enviorment),
+                    BinOp::Assign,
+                    Box::new(Expression::BinaryExpr(BinaryExpr::new(
+                        Box::new(Expression::Identifier(id.to_string())),
+                        BinOp::Subtract,
+                        Box::new(Expression::LiteralExpr(Literal::Number(1.0))),
+                    ))),
+                ),
+                scoped_enviorment,
+            ),
         };
 
         val
     }
 
-    fn evaluate_binary_expression(&self, expression: &BinaryExpr, scoped_enviorment: Rc<RefCell<Enviorment>>) -> Value {
+    fn evaluate_binary_expression(
+        &self,
+        expression: &BinaryExpr,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) -> Value {
         match expression.operator {
             BinOp::Add => self
                 .evaluate_expression(&*expression.left, scoped_enviorment.clone())
@@ -414,35 +457,51 @@ impl Runtime {
                 .divide(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone())),
             BinOp::LessThan => Value::Boolean(
                 self.evaluate_expression(&*expression.left, scoped_enviorment.clone())
-                    .less_than(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone())),
+                    .less_than(
+                        &self.evaluate_expression(&*expression.right, scoped_enviorment.clone()),
+                    ),
             ),
             BinOp::GreaterThan => Value::Boolean(
                 self.evaluate_expression(&*expression.left, scoped_enviorment.clone())
-                    .greater_than(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone())),
+                    .greater_than(
+                        &self.evaluate_expression(&*expression.right, scoped_enviorment.clone()),
+                    ),
             ),
             BinOp::LessThanEqual => Value::Boolean(
                 self.evaluate_expression(&*expression.left, scoped_enviorment.clone())
-                    .less_than_or_equal_to(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone())),
+                    .less_than_or_equal_to(
+                        &self.evaluate_expression(&*expression.right, scoped_enviorment.clone()),
+                    ),
             ),
             BinOp::GreaterThanEqual => Value::Boolean(
                 self.evaluate_expression(&*expression.left, scoped_enviorment.clone())
-                    .greater_than_or_equal_to(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone())),
+                    .greater_than_or_equal_to(
+                        &self.evaluate_expression(&*expression.right, scoped_enviorment.clone()),
+                    ),
             ),
             BinOp::EqualTo => Value::Boolean(
                 self.evaluate_expression(&*expression.left, scoped_enviorment.clone())
-                    .equals(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone())),
+                    .equals(
+                        &self.evaluate_expression(&*expression.right, scoped_enviorment.clone()),
+                    ),
             ),
             BinOp::NotEqual => Value::Boolean(
                 self.evaluate_expression(&*expression.left, scoped_enviorment.clone())
-                    .not_equals(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone())),
+                    .not_equals(
+                        &self.evaluate_expression(&*expression.right, scoped_enviorment.clone()),
+                    ),
             ),
             BinOp::LogicalOr => self
                 .evaluate_expression(&*expression.left, scoped_enviorment.clone())
-                .logical_or(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone()))
+                .logical_or(
+                    &self.evaluate_expression(&*expression.right, scoped_enviorment.clone()),
+                )
                 .clone(),
             BinOp::LogicalAnd => self
                 .evaluate_expression(&*expression.left, scoped_enviorment.clone())
-                .logical_and(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone()))
+                .logical_and(
+                    &self.evaluate_expression(&*expression.right, scoped_enviorment.clone()),
+                )
                 .clone(),
             BinOp::Assign => {
                 let right = self.evaluate_expression(&*expression.right, scoped_enviorment.clone());
@@ -461,25 +520,36 @@ impl Runtime {
         }
     }
 
-    fn evaluate_unary_expression(&self, expression: &UnaryExpr, scoped_enviorment: Rc<RefCell<Enviorment>>) -> Value {
+    fn evaluate_unary_expression(
+        &self,
+        expression: &UnaryExpr,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) -> Value {
         match expression.operator {
-            UnOp::Not => {
-                Value::Boolean(!self.evaluate_expression(&*expression.operand, scoped_enviorment).is_truthy())
-            }
+            UnOp::Not => Value::Boolean(
+                !self
+                    .evaluate_expression(&*expression.operand, scoped_enviorment)
+                    .is_truthy(),
+            ),
             UnOp::Negate => self
                 .evaluate_expression(&*expression.operand, scoped_enviorment)
                 .multiply(&Value::Number(-1.0)),
         }
     }
 
-    fn evaluate_identifier(&self, identifier: &String,  scoped_enviorment: Rc<RefCell<Enviorment>>) -> Value {
-        scoped_enviorment
-            .borrow()
-            .get_variable(identifier)
-            .clone()
+    fn evaluate_identifier(
+        &self,
+        identifier: &String,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) -> Value {
+        scoped_enviorment.borrow().get_variable(identifier).clone()
     }
 
-    fn declare_variable(&self, decleration: &VariableDecleration, scoped_enviorment: Rc<RefCell<Enviorment>>) {
+    fn declare_variable(
+        &self,
+        decleration: &VariableDecleration,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) {
         let id = &decleration.id;
 
         let init = if let Some(init_expr) = &decleration.init {
@@ -494,7 +564,9 @@ impl Runtime {
     }
 
     fn if_statement(&self, statement: &IfStmt, scoped_enviorment: Rc<RefCell<Enviorment>>) {
-        let condition = self.evaluate_expression(&statement.condition, scoped_enviorment.clone()).is_truthy();
+        let condition = self
+            .evaluate_expression(&statement.condition, scoped_enviorment.clone())
+            .is_truthy();
 
         if condition {
             self.execute_statement(&statement.consequent, scoped_enviorment.clone());
@@ -503,66 +575,132 @@ impl Runtime {
         }
     }
 
-    fn block_statement(&self, statement: &Vec<Statement>, scoped_enviorment: Rc<RefCell<Enviorment>>) {
-        let scope = Rc::new(RefCell::new(Enviorment::new(Some(Rc::<RefCell<Enviorment>>::downgrade(&scoped_enviorment)))));
-        let in_function = scoped_enviorment.borrow().variables.get("return-value").is_some();
+    fn block_statement(
+        &self,
+        statement: &Vec<Statement>,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) {
+        let scope = Rc::new(RefCell::new(Enviorment::new(Some(
+            Rc::<RefCell<Enviorment>>::downgrade(&scoped_enviorment),
+        ))));
+        let in_function = scoped_enviorment
+            .borrow()
+            .variables
+            .get("return-value")
+            .is_some();
         for single_statement in statement {
-            if in_function && scoped_enviorment.borrow().variables.get("return-value").expect("Already Checked").clone() != Value::Null {
+            if in_function
+                && scoped_enviorment
+                    .borrow()
+                    .variables
+                    .get("return-value")
+                    .expect("Already Checked")
+                    .clone()
+                    != Value::Null
+            {
                 break;
             }
             self.execute_statement(single_statement, scope.clone())
         }
     }
 
-    fn declare_function(&self, decleration: &FuncDecleration, scoped_enviorment: Rc<RefCell<Enviorment>>) {
-        scoped_enviorment.borrow_mut().create_variable(decleration.id.clone(), Some(Value::Function(Function::new(decleration.parameters.clone(), *decleration.body.clone()))))
+    fn declare_function(
+        &self,
+        decleration: &FuncDecleration,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) {
+        scoped_enviorment.borrow_mut().create_variable(
+            decleration.id.clone(),
+            Some(Value::Function(Function::new(
+                decleration.parameters.clone(),
+                *decleration.body.clone(),
+            ))),
+        )
     }
 
-    fn invoke_function(&self, function_call: &CallExpr, scoped_enviorment: Rc<RefCell<Enviorment>>) -> Value {
+    fn invoke_function(
+        &self,
+        function_call: &CallExpr,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) -> Value {
         if function_call.callee == "print" {
             self.print(function_call, scoped_enviorment);
             return Value::Null;
         }
-        if let Value::Function(callee) = scoped_enviorment.borrow().get_variable(&function_call.callee) {
+        if let Value::Function(callee) = scoped_enviorment
+            .borrow()
+            .get_variable(&function_call.callee)
+        {
             if function_call.arguments.len() != callee.arguments.len() {
                 panic!("Arguments don't match up");
             }
-            let scope = Rc::new(RefCell::new(Enviorment::new(Some(Rc::<RefCell<Enviorment>>::downgrade(&scoped_enviorment.clone())))));
+            let scope = Rc::new(RefCell::new(Enviorment::new(Some(
+                Rc::<RefCell<Enviorment>>::downgrade(&scoped_enviorment.clone()),
+            ))));
             // Hyphonated to make it an invalid JS variable
-            scope.borrow_mut().create_variable("return-value".to_string(), None);
-            for (arg_name, arg_expression) in callee.arguments.iter().zip(function_call.arguments.iter()) {
+            scope
+                .borrow_mut()
+                .create_variable("return-value".to_string(), None);
+            for (arg_name, arg_expression) in
+                callee.arguments.iter().zip(function_call.arguments.iter())
+            {
                 let arg_value = self.evaluate_expression(arg_expression, scoped_enviorment.clone());
-                scope.borrow_mut().create_variable(arg_name.clone(), Some(arg_value));
+                scope
+                    .borrow_mut()
+                    .create_variable(arg_name.clone(), Some(arg_value));
             }
 
             self.execute_statement(&callee.body, scope.clone());
 
-            return scope.borrow().variables.get("return-value").expect("Should Always exist").clone();
-            
+            return scope
+                .borrow()
+                .variables
+                .get("return-value")
+                .expect("Should Always exist")
+                .clone();
         } else {
             panic!("Function Not Found")
         };
-
     }
 
     fn print(&self, function_call: &CallExpr, scoped_enviorment: Rc<RefCell<Enviorment>>) {
-        println!("{:?}", self.evaluate_expression(&function_call.arguments[0], scoped_enviorment));
+        println!(
+            "{:?}",
+            self.evaluate_expression(&function_call.arguments[0], scoped_enviorment)
+        );
     }
 
-    fn return_statement(&self, return_expression: &Expression, scoped_enviorment: Rc<RefCell<Enviorment>>) {
-        let evaluated_expr = self.evaluate_expression(&return_expression, scoped_enviorment.clone());
-        scoped_enviorment.borrow_mut().assign_variable("return-value".to_string(), evaluated_expr)
+    fn return_statement(
+        &self,
+        return_expression: &Expression,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) {
+        let evaluated_expr =
+            self.evaluate_expression(&return_expression, scoped_enviorment.clone());
+        scoped_enviorment
+            .borrow_mut()
+            .assign_variable("return-value".to_string(), evaluated_expr)
     }
 
-    fn while_statement(&self, while_statement: &WhileStmt, scoped_enviorment: Rc<RefCell<Enviorment>>) {
-        while self.evaluate_expression(&while_statement.condition, scoped_enviorment.clone()).is_truthy() {
+    fn while_statement(
+        &self,
+        while_statement: &WhileStmt,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) {
+        while self
+            .evaluate_expression(&while_statement.condition, scoped_enviorment.clone())
+            .is_truthy()
+        {
             self.execute_statement(&while_statement.body, scoped_enviorment.clone())
         }
     }
 
     fn for_statement(&self, for_statement: &ForStmt, scoped_enviorment: Rc<RefCell<Enviorment>>) {
         self.execute_statement(&for_statement.initialization, scoped_enviorment.clone());
-        while self.evaluate_expression(&for_statement.condition, scoped_enviorment.clone()).is_truthy() {
+        while self
+            .evaluate_expression(&for_statement.condition, scoped_enviorment.clone())
+            .is_truthy()
+        {
             self.execute_statement(&for_statement.body, scoped_enviorment.clone());
             self.execute_statement(&for_statement.afterthought, scoped_enviorment.clone());
         }
