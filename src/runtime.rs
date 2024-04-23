@@ -434,7 +434,6 @@ impl Runtime {
             StatementValue::ForStmt(for_statement) => {
                 self.for_statement(for_statement, scoped_enviorment)
             }
-            _ => todo!(),
         };
     }
 
@@ -444,14 +443,14 @@ impl Runtime {
         scoped_enviorment: Rc<RefCell<Enviorment>>,
     ) -> Value {
         let val = match expression {
-            Expression::BinaryExpr(BinExp) => {
-                self.evaluate_binary_expression(BinExp, scoped_enviorment)
+            Expression::BinaryExpr(bin_exp) => {
+                self.evaluate_binary_expression(bin_exp, scoped_enviorment)
             }
-            Expression::UnaryExpr(UnExp) => {
-                self.evaluate_unary_expression(UnExp, scoped_enviorment)
+            Expression::UnaryExpr(un_exp) => {
+                self.evaluate_unary_expression(un_exp, scoped_enviorment)
             }
-            Expression::CallExpr(CallExp) => self.invoke_function(CallExp, scoped_enviorment),
-            Expression::LiteralExpr(LitExp) => Value::from_literal(LitExp),
+            Expression::CallExpr(call_exp) => self.invoke_function(call_exp, scoped_enviorment),
+            Expression::LiteralExpr(lit_exp) => Value::from_literal(lit_exp),
             Expression::Identifier(id) => self.evaluate_identifier(id, scoped_enviorment),
             Expression::Increment(id) => self.evaluate_binary_expression(
                 &BinaryExpr::new(
