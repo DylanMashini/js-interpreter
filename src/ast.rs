@@ -1,13 +1,3 @@
-
-#[derive(Debug,Clone,PartialEq)]
-pub enum Node {
-    Literal(Literal),
-    Identifier(String),
-    Expression(Expression),
-    Statement(Statement),
-    Program(Vec<Statement>),
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Number(f64),
