@@ -12,13 +12,13 @@ fn main() {
     // println!("Source Code: \n\n{}\n", contents);
     let mut lexer = Lexer::new(contents);
     let tokens = lexer.tokenize();
+    // println!("Tokens:\n{:?}", tokens);
+
     let ast = Parser::new(tokens.clone()).parse();
     
-    // println!("Tokens:\n{:?}", tokens);
     // println!("\nAST:\n{:?}",parser::Parser::new(tokens.clone()).parse());
 
     let mut runtime = Runtime::new(ast);
     runtime.run();
 
 }
-

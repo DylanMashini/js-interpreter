@@ -1,5 +1,6 @@
 use crate::ast::{
-    BinOp, BinaryExpr, CallExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program, Statement, UnOp, UnaryExpr, VariableDecleration, WhileStmt
+    BinOp, BinaryExpr, CallExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program,
+    Statement, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
 };
 
 use crate::lexer::Token;
@@ -150,36 +151,51 @@ impl Parser {
 
         self.consume(Token::Semicolon, "Expect semicolon after condition");
 
-        let afterthought = Box::new(self.statement().expect("Afterthought is required in this implementation of javascript"));
-        
-        self.consume(Token::RParentheses, "Right parentheses is required after for loop afterthought");
+        let afterthought = Box::new(
+            self.statement()
+                .expect("Afterthought is required in this implementation of javascript"),
+        );
 
-        let body = Box::new(self.statement().expect("Statement is required for for loop"));
+        self.consume(
+            Token::RParentheses,
+            "Right parentheses is required after for loop afterthought",
+        );
+
+        let body = Box::new(
+            self.statement()
+                .expect("Statement is required for for loop"),
+        );
 
         Statement::ForStmt(ForStmt::new(init, condition, afterthought, body))
     }
 
     fn function_decleration(&mut self) -> Statement {
-        self.consume(Token::Function, "Functions should start with function keyword");
+        self.consume(
+            Token::Function,
+            "Functions should start with function keyword",
+        );
 
         let id = match self.peek() {
             Token::Identifier(id) => id.clone(),
-            _ => panic!("Functions must be named")
+            _ => panic!("Functions must be named"),
         };
         // Advacne past function name
         self.advance();
 
-        self.consume(Token::LParentheses, "Function must have arguments in parentheses");
+        self.consume(
+            Token::LParentheses,
+            "Function must have arguments in parentheses",
+        );
 
         let mut arguments: Vec<String> = Vec::new();
         loop {
             let arg_name = match self.peek() {
                 Token::Identifier(id) => id.clone(),
-                _ => panic!("Expected Argument Name")
+                _ => break,
             };
             // Advance Identifier token with name of argument
             self.advance();
-            
+
             arguments.push(arg_name);
 
             if let Token::Comma = self.peek() {
@@ -189,7 +205,10 @@ impl Parser {
             }
         }
 
-        self.consume(Token::RParentheses, "Expected Closing Parentheses after arguments");
+        self.consume(
+            Token::RParentheses,
+            "Expected Closing Parentheses after arguments",
+        );
 
         // Function must be a block statement
         let body = Box::new(self.block_statement());
@@ -199,8 +218,8 @@ impl Parser {
 
     fn return_statement(&mut self) -> Statement {
         self.consume(Token::Return, "Return statement should start with 'return'");
-        
-        Statement::ReturnStatement(self.expression()) 
+
+        Statement::ReturnStatement(self.expression())
     }
 
     // Checks to see if token parameter matches current token, and if we are finished
@@ -268,11 +287,14 @@ impl Parser {
         if let Some(_) = self.match_token_consume(Token::Equal) {
             let right_side = self.logical_or();
 
-            expr = Expression::BinaryExpr(BinaryExpr::new(Box::new(expr), BinOp::Assign, Box::new(right_side)));
+            expr = Expression::BinaryExpr(BinaryExpr::new(
+                Box::new(expr),
+                BinOp::Assign,
+                Box::new(right_side),
+            ));
         }
 
         expr
-
     }
 
     fn logical_or(&mut self) -> Expression {
@@ -290,7 +312,8 @@ impl Parser {
 
         while let Some(_) = self.match_token_consume(Token::And) {
             let right = Box::new(self.equality());
-            expr = Expression::BinaryExpr(BinaryExpr::new(Box::new(expr), BinOp::LogicalAnd, right));
+            expr =
+                Expression::BinaryExpr(BinaryExpr::new(Box::new(expr), BinOp::LogicalAnd, right));
         }
         expr
     }
@@ -305,11 +328,8 @@ impl Parser {
             };
             self.advance(); // Consume token if it was an operator (Either == or != for now)
             let right = self.comparison();
-            expr = Expression::BinaryExpr(BinaryExpr::new(
-                Box::new(expr),
-                operator,
-                Box::new(right),
-            ));
+            expr =
+                Expression::BinaryExpr(BinaryExpr::new(Box::new(expr), operator, Box::new(right)));
         }
         expr
     }
@@ -401,8 +421,8 @@ impl Parser {
                 } else {
                     Expression::Identifier(id)
                 }
-            },
-            _ => expr
+            }
+            _ => expr,
         }
     }
 
@@ -410,8 +430,8 @@ impl Parser {
         if let Some(_) = self.match_token_consume(Token::Minus) {
             let operand = self.unary();
             Expression::UnaryExpr(UnaryExpr::new(UnOp::Negate, Box::new(operand)))
-        } else if let Some(_) =self.match_token_consume(Token::Not){
-            let operand= self.unary();
+        } else if let Some(_) = self.match_token_consume(Token::Not) {
+            let operand = self.unary();
             Expression::UnaryExpr(UnaryExpr::new(UnOp::Not, Box::new(operand)))
         } else {
             self.call_expression()
@@ -427,18 +447,24 @@ impl Parser {
                     // We are calling a function
                     let mut parameters: Vec<Expression> = Vec::new();
                     loop {
+                        if *self.peek()  == Token::RParentheses {
+                            break;
+                        };
                         parameters.push(self.expression());
-                        if (self.match_token_consume(Token::Comma)).is_none() {
-                            break
+                        if self.match_token_consume(Token::Comma).is_none() {
+                            break;
                         }
                     }
-                    self.consume(Token::RParentheses, "Closing Parentheses required to end parameters in function call");
+                    self.consume(
+                        Token::RParentheses,
+                        "Closing Parentheses required to end parameters in function call",
+                    );
                     Expression::CallExpr(CallExpr::new(id, parameters))
                 } else {
                     Expression::Identifier(id) // Expr is moved, so I have to manually copy it
                 }
-            },
-            _ => expr
+            }
+            _ => expr,
         }
     }
 
