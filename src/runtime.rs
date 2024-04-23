@@ -2,7 +2,7 @@
 
 use crate::ast::{
     BinOp, BinaryExpr, CallExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program,
-    Statement, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
+    Statement, UnOp, UnaryExpr, VariableDecleration, WhileStmt, StatementValue
 };
 use core::fmt;
 use std::{
@@ -10,6 +10,7 @@ use std::{
     collections::HashMap,
     rc::{Rc, Weak},
 };
+
 
 #[derive(Debug, Clone, PartialEq)]
 struct Function {
@@ -283,6 +284,45 @@ impl Value {
             other.clone()
         }
     }
+
+    pub fn modulo(&self, other: &Value) -> Value {
+        match (self, other) {
+            (Value::Number(a), Value::Number(b)) => {
+                if *b == 0.0 {
+                    panic!("Division by zero in modulo operation");
+                } else {
+                    Value::Number(a % b)
+                }
+            },
+            (Value::Number(a), Value::Boolean(b)) => {
+                let b_as_f64 = if *b { 1.0 } else { 0.0 };
+                if b_as_f64 == 0.0 {
+                    panic!("Division by zero in modulo operation");
+                } else {
+                    Value::Number(a % b_as_f64)
+                }
+            },
+            (Value::Boolean(a), Value::Number(b)) => {
+                let a_as_f64 = if *a { 1.0 } else { 0.0 };
+                if *b == 0.0 {
+                    panic!("Division by zero in modulo operation");
+                } else {
+                    Value::Number(a_as_f64 % b)
+                }
+            },
+            (Value::Boolean(a), Value::Boolean(b)) => {
+                let a_as_f64 = if *a { 1.0 } else { 0.0 };
+                let b_as_f64 = if *b { 1.0 } else { 0.0 };
+                if b_as_f64 == 0.0 {
+                    panic!("Division by zero in modulo operation");
+                } else {
+                    Value::Number(a_as_f64 % b_as_f64)
+                }
+            },
+            _ => panic!("Modulo operation not supported for non-numeric types"),
+        }
+    }
+
 }
 
 struct Enviorment {
@@ -340,6 +380,7 @@ impl Enviorment {
 pub struct Runtime {
     ast: Program,
     position: usize,
+    line: RefCell<usize>,
     root_enviorment: Rc<RefCell<Enviorment>>,
 }
 
@@ -348,6 +389,7 @@ impl Runtime {
         Runtime {
             ast,
             position: 0,
+            line: RefCell::new(0),
             root_enviorment: Rc::new(RefCell::new(Enviorment::new(None))),
         }
     }
@@ -359,34 +401,34 @@ impl Runtime {
     }
     fn execute_next_statement(&mut self) {
         let mut statement = &self.ast.body[self.position];
-
         self.execute_statement(statement, self.root_enviorment.clone());
 
         self.position += 1;
     }
     // Evaluates the next statement
     fn execute_statement(&self, statement: &Statement, scoped_enviorment: Rc<RefCell<Enviorment>>) {
-        match statement {
-            Statement::ExpressionStmt(expression) => {
+        *self.line.borrow_mut() = statement.line.into();
+        match &statement.value {
+            StatementValue::ExpressionStmt(expression) => {
                 self.evaluate_expression(expression, scoped_enviorment);
             }
-            Statement::VariableStmt(decleration) => {
+            StatementValue::VariableStmt(decleration) => {
                 self.declare_variable(decleration, scoped_enviorment)
             }
-            Statement::IfStmt(if_statement) => self.if_statement(if_statement, scoped_enviorment),
-            Statement::BlockStmt(block_statement) => {
+            StatementValue::IfStmt(if_statement) => self.if_statement(if_statement, scoped_enviorment),
+            StatementValue::BlockStmt(block_statement) => {
                 self.block_statement(block_statement, scoped_enviorment)
             }
-            Statement::FunctionDecleration(function_decleration) => {
+            StatementValue::FunctionDecleration(function_decleration) => {
                 self.declare_function(function_decleration, scoped_enviorment)
             }
-            Statement::ReturnStatement(expression) => {
+            StatementValue::ReturnStatement(expression) => {
                 self.return_statement(expression, scoped_enviorment)
             }
-            Statement::WhileStmt(while_statement) => {
+            StatementValue::WhileStmt(while_statement) => {
                 self.while_statement(while_statement, scoped_enviorment)
             }
-            Statement::ForStmt(for_statement) => {
+            StatementValue::ForStmt(for_statement) => {
                 self.for_statement(for_statement, scoped_enviorment)
             }
             _ => todo!(),
@@ -461,6 +503,7 @@ impl Runtime {
                         &self.evaluate_expression(&*expression.right, scoped_enviorment.clone()),
                     ),
             ),
+            BinOp::Modulo => self.evaluate_expression(&*expression.left, scoped_enviorment.clone()).modulo(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone())),
             BinOp::GreaterThan => Value::Boolean(
                 self.evaluate_expression(&*expression.left, scoped_enviorment.clone())
                     .greater_than(
@@ -613,7 +656,7 @@ impl Runtime {
             decleration.id.clone(),
             Some(Value::Function(Function::new(
                 decleration.parameters.clone(),
-                *decleration.body.clone(),
+                Statement::new(*decleration.body.clone(), *self.line.borrow()),
             ))),
         )
     }
@@ -708,5 +751,10 @@ impl Runtime {
 
     fn finished(&mut self) -> bool {
         self.position >= self.ast.body.len()
+    }
+
+
+    fn error(&self, message: String) {
+        panic!("Runtime ERROR\nLine:{}\n{}", *self.line.borrow(), message);
     }
 }

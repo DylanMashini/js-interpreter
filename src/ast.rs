@@ -65,6 +65,7 @@ pub enum BinOp {
     LogicalOr,
     LogicalAnd,
     Assign,
+    Modulo,
 }
 
 #[derive(Debug,Clone,PartialEq)]
@@ -89,7 +90,22 @@ pub enum UnOp {
 }
 
 #[derive(Debug,Clone,PartialEq)]
-pub enum Statement {
+pub struct Statement {
+    pub value: StatementValue,
+    pub line: usize,
+}
+
+impl Statement {
+    pub fn new(value: StatementValue, line: usize) -> Statement {
+        Statement {
+            value,
+            line
+        }
+    }
+}
+
+#[derive(Debug,Clone,PartialEq)]
+pub enum StatementValue {
     ExpressionStmt(Expression),
     BlockStmt(Vec<Statement>),
     IfStmt(IfStmt),
@@ -170,11 +186,11 @@ impl ForStmt {
 pub struct FuncDecleration {
     pub id: String,
     pub parameters: Vec<String>,
-    pub body: Box<Statement>,
+    pub body: Box<StatementValue>,
 }
 
 impl FuncDecleration {
-    pub fn new(id: String, parameters: Vec<String>, body: Box<Statement>) -> FuncDecleration {
+    pub fn new(id: String, parameters: Vec<String>, body: Box<StatementValue>) -> FuncDecleration {
         FuncDecleration {
             id,
             parameters,
