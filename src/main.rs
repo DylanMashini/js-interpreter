@@ -16,7 +16,7 @@ fn main() {
 
     let ast = Parser::new(tokens.clone()).parse();
     
-    // println!("\nAST:\n{:?}",parser::Parser::new(tokens.clone()).parse());
+    println!("\nAST:\n{:?}",parser::Parser::new(tokens.clone()).parse());
 
     let mut runtime = Runtime::new(ast);
     runtime.run();

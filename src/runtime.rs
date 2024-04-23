@@ -399,13 +399,16 @@ impl Runtime {
             self.execute_next_statement();
         }
     }
+
+    // Excecutes the next statement in the AST
     fn execute_next_statement(&mut self) {
-        let mut statement = &self.ast.body[self.position];
+        let statement = &self.ast.body[self.position];
         self.execute_statement(statement, self.root_enviorment.clone());
 
         self.position += 1;
     }
-    // Evaluates the next statement
+
+    // Excecutes a Statement
     fn execute_statement(&self, statement: &Statement, scoped_enviorment: Rc<RefCell<Enviorment>>) {
         *self.line.borrow_mut() = statement.line.into();
         match &statement.value {
@@ -551,7 +554,7 @@ impl Runtime {
 
                 let id = match &*expression.left {
                     Expression::Identifier(id) => id,
-                    _ => panic!("Left side of Assign BinOp must be identifier"),
+                    _ => self.error("Left side of Assign BinOp must be identifier"),
                 };
 
                 scoped_enviorment
@@ -702,7 +705,7 @@ impl Runtime {
                 .expect("Should Always exist")
                 .clone();
         } else {
-            panic!("Function Not Found")
+            self.error("Function Not Found")
         };
     }
 
@@ -754,7 +757,7 @@ impl Runtime {
     }
 
 
-    fn error(&self, message: String) {
-        panic!("Runtime ERROR\nLine:{}\n{}", *self.line.borrow(), message);
+    fn error(&self, message: &str) -> ! {
+        panic!("Runtime ERROR\nLine:{}\n{}", *self.line.borrow(), message)
     }
 }
