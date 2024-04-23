@@ -6,12 +6,8 @@ pub struct Token {
 
 impl Token {
     pub fn new(value: TokenValue, line: usize) -> Token {
-        Token {
-            value,
-            line
-        }
+        Token { value, line }
     }
-
 }
 
 impl Into<TokenValue> for Token {
@@ -19,8 +15,6 @@ impl Into<TokenValue> for Token {
         self.value
     }
 }
-
-
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenValue {
@@ -31,7 +25,7 @@ pub enum TokenValue {
     While,
     For,
     Function,
-    Return, 
+    Return,
 
     Identifier(String),
 
@@ -113,13 +107,13 @@ impl Lexer {
                                 current_token.push(c);
                                 self.state = State::InNumber;
                             }
-                            'a'..='z' | 'A'..='Z'  => {
+                            'a'..='z' | 'A'..='Z' => {
                                 current_token.push(c);
                                 self.state = State::InIdentifier;
                             }
                             '"' | '\'' => {
                                 self.state = State::InString(c);
-                            },
+                            }
                             '[' => tokens.push(Token::new(TokenValue::LBracket, line_num + 1)),
                             ']' => tokens.push(Token::new(TokenValue::RBracket, line_num + 1)),
                             '{' => tokens.push(Token::new(TokenValue::LCurlyBracket, line_num + 1)),
@@ -130,10 +124,10 @@ impl Lexer {
                             '%' => tokens.push(Token::new(TokenValue::Modulo, line_num + 1)),
                             ',' => tokens.push(Token::new(TokenValue::Comma, line_num + 1)),
                             ';' => tokens.push(Token::new(TokenValue::Semicolon, line_num + 1)),
-                            '>' | '<' | '=' | '!' | '+' | '-' | '*' | '/' | '|' | '&'  => {
+                            '>' | '<' | '=' | '!' | '+' | '-' | '*' | '/' | '|' | '&' => {
                                 current_token.push(c);
                                 self.state = State::InOperator
-                            },
+                            }
                             ' ' | '\t' => (), // Ignore whitespace
                             _ => (),
                         },
@@ -153,18 +147,35 @@ impl Lexer {
                             _ => {
                                 match current_token.as_str() {
                                     "if" => tokens.push(Token::new(TokenValue::If, line_num + 1)),
-                                    "else" => tokens.push(Token::new(TokenValue::Else, line_num + 1)),
+                                    "else" => {
+                                        tokens.push(Token::new(TokenValue::Else, line_num + 1))
+                                    }
                                     "let" => tokens.push(Token::new(TokenValue::Let, line_num + 1)),
                                     "var" => tokens.push(Token::new(TokenValue::Let, line_num + 1)),
-                                    "null" => tokens.push(Token::new(TokenValue::Null, line_num + 1)),
-                                    "undefined" => tokens.push(Token::new(TokenValue::Undefined, line_num + 1)),
-                                    "true" => tokens.push(Token::new(TokenValue::Boolean(true), line_num + 1)),
-                                    "false" => tokens.push(Token::new(TokenValue::Boolean(false), line_num + 1)),
-                                    "while" => tokens.push(Token::new(TokenValue::While, line_num + 1)),
+                                    "null" => {
+                                        tokens.push(Token::new(TokenValue::Null, line_num + 1))
+                                    }
+                                    "undefined" => {
+                                        tokens.push(Token::new(TokenValue::Undefined, line_num + 1))
+                                    }
+                                    "true" => tokens
+                                        .push(Token::new(TokenValue::Boolean(true), line_num + 1)),
+                                    "false" => tokens
+                                        .push(Token::new(TokenValue::Boolean(false), line_num + 1)),
+                                    "while" => {
+                                        tokens.push(Token::new(TokenValue::While, line_num + 1))
+                                    }
                                     "for" => tokens.push(Token::new(TokenValue::For, line_num + 1)),
-                                    "function" => tokens.push(Token::new(TokenValue::Function, line_num + 1)),
-                                    "return" => tokens.push(Token::new(TokenValue::Return, line_num + 1)),
-                                    _ => tokens.push(Token::new(TokenValue::Identifier(current_token.clone()), line_num + 1)),
+                                    "function" => {
+                                        tokens.push(Token::new(TokenValue::Function, line_num + 1))
+                                    }
+                                    "return" => {
+                                        tokens.push(Token::new(TokenValue::Return, line_num + 1))
+                                    }
+                                    _ => tokens.push(Token::new(
+                                        TokenValue::Identifier(current_token.clone()),
+                                        line_num + 1,
+                                    )),
                                 }
                                 current_token.clear();
                                 self.state = State::Normal;
@@ -173,20 +184,22 @@ impl Lexer {
                         },
                         State::InString(quote_char) => {
                             if c == quote_char {
-                                tokens.push(Token::new(TokenValue::String(current_token.clone()), line_num + 1));
+                                tokens.push(Token::new(
+                                    TokenValue::String(current_token.clone()),
+                                    line_num + 1,
+                                ));
                                 current_token.clear();
                                 self.state = State::Normal;
                             } else {
                                 current_token.push(c);
                             }
-                        },
-                        State::InOperator => {
-                            match c {
-                                '=' | '+' | '-' | '|' | '&' => {
-                                    current_token.push(c);
-                                }
-                                _ => {
-                                    match current_token.as_str() {
+                        }
+                        State::InOperator => match c {
+                            '=' | '+' | '-' | '|' | '&' => {
+                                current_token.push(c);
+                            }
+                            _ => {
+                                match current_token.as_str() {
                                         "=" => tokens.push(Token::new(TokenValue::Equal, line_num + 1)),
                                         "==" => tokens.push(Token::new(TokenValue::DoubleEqual, line_num + 1)),
                                         "===" => tokens.push(Token::new(TokenValue::TripleEqual, line_num + 1)),
@@ -209,23 +222,24 @@ impl Lexer {
                                         val => panic!("Tokenization Error on line: {}\nUnknown operator token: {}", line_num + 1, val)
 
                                     }
-                                    current_token.clear();
-                                    self.state = State::Normal;
-                                    continue;
-                                }
+                                current_token.clear();
+                                self.state = State::Normal;
+                                continue;
                             }
-                        }
+                        },
                     }
                     self.position += 1;
                     break;
                 }
             }
-            if tokens.last().is_some_and(|tok| tok.value != TokenValue::EOL) {
+            if tokens
+                .last()
+                .is_some_and(|tok| tok.value != TokenValue::EOL)
+            {
                 tokens.push(Token::new(TokenValue::EOL, line_num + 1));
             }
         }
 
         tokens
     }
-
 }

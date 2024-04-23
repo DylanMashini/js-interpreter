@@ -1,6 +1,6 @@
 use crate::ast::{
     BinOp, BinaryExpr, CallExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program,
-    Statement, UnOp, UnaryExpr, VariableDecleration, WhileStmt, StatementValue
+    Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
 };
 
 use crate::lexer::{Token, TokenValue};
@@ -52,7 +52,7 @@ impl Parser {
 
         match value {
             Some(val) => Some(Statement::new(val, line)),
-            None => None
+            None => None,
         }
     }
 
@@ -105,7 +105,8 @@ impl Parser {
 
     pub fn variable_declaration(&mut self) -> StatementValue {
         self.consume(TokenValue::Let, "expected 'let'");
-        if let TokenValue::Identifier(name) = self.consume_identifier("Expect variable name.").value {
+        if let TokenValue::Identifier(name) = self.consume_identifier("Expect variable name.").value
+        {
             let init = if self.match_token_consume(TokenValue::Equal).is_some() {
                 Some(Box::new(self.expression()))
             } else {
@@ -127,7 +128,10 @@ impl Parser {
 
     fn while_loop_statement(&mut self) -> StatementValue {
         self.consume(TokenValue::While, "While loop should start with while");
-        self.consume(TokenValue::LParentheses, "While Condition requires Parentheses");
+        self.consume(
+            TokenValue::LParentheses,
+            "While Condition requires Parentheses",
+        );
 
         let condition = self.expression();
 
@@ -223,7 +227,10 @@ impl Parser {
     }
 
     fn return_statement(&mut self) -> StatementValue {
-        self.consume(TokenValue::Return, "Return statement should start with 'return'");
+        self.consume(
+            TokenValue::Return,
+            "Return statement should start with 'return'",
+        );
 
         StatementValue::ReturnStatement(self.expression())
     }
@@ -305,16 +312,24 @@ impl Parser {
     // Also handles minus_equal
     fn plus_equal(&mut self) -> Expression {
         let mut expr = self.logical_or();
-        
+
         let operator = match self.peek().value {
             TokenValue::PlusEqual => Some(BinOp::Add),
             TokenValue::MinusEqual => Some(BinOp::Subtract),
-            _ => None
+            _ => None,
         };
 
         if let Some(op) = operator {
             self.advance();
-            expr = Expression::BinaryExpr(BinaryExpr::new(Box::new(expr.clone()), BinOp::Assign, Box::new(Expression::BinaryExpr(BinaryExpr::new(Box::new(expr), op, Box::new(self.logical_or()))))));
+            expr = Expression::BinaryExpr(BinaryExpr::new(
+                Box::new(expr.clone()),
+                BinOp::Assign,
+                Box::new(Expression::BinaryExpr(BinaryExpr::new(
+                    Box::new(expr),
+                    op,
+                    Box::new(self.logical_or()),
+                ))),
+            ));
         };
 
         expr
@@ -369,7 +384,10 @@ impl Parser {
                 .is_some()
             {
                 Some(BinOp::GreaterThanEqual)
-            } else if self.match_token_consume(TokenValue::LessThanEqualTo).is_some() {
+            } else if self
+                .match_token_consume(TokenValue::LessThanEqualTo)
+                .is_some()
+            {
                 Some(BinOp::LessThanEqual)
             } else {
                 None
@@ -437,7 +455,11 @@ impl Parser {
         loop {
             if self.match_token_consume(TokenValue::Modulo).is_some() {
                 let right = self.increment();
-                expr = Expression::BinaryExpr(BinaryExpr::new(Box::new(expr), BinOp::Modulo, Box::new(right)));
+                expr = Expression::BinaryExpr(BinaryExpr::new(
+                    Box::new(expr),
+                    BinOp::Modulo,
+                    Box::new(right),
+                ));
             } else {
                 break;
             }
@@ -485,7 +507,7 @@ impl Parser {
                     // We are calling a function
                     let mut parameters: Vec<Expression> = Vec::new();
                     loop {
-                        if self.peek().value  == TokenValue::RParentheses {
+                        if self.peek().value == TokenValue::RParentheses {
                             break;
                         };
                         parameters.push(self.expression());

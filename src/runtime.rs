@@ -2,7 +2,7 @@
 
 use crate::ast::{
     BinOp, BinaryExpr, CallExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program,
-    Statement, UnOp, UnaryExpr, VariableDecleration, WhileStmt, StatementValue
+    Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
 };
 use core::fmt;
 use std::{
@@ -10,7 +10,6 @@ use std::{
     collections::HashMap,
     rc::{Rc, Weak},
 };
-
 
 #[derive(Debug, Clone, PartialEq)]
 struct Function {
@@ -35,13 +34,17 @@ enum Value {
 
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", match self {
-            Value::Number(val) => val.to_string(),
-            Value::String(val) => val.to_string(),
-            Value::Boolean(val) => val.to_string(),
-            Value::Function(_) => format!("Printing Functions Not Supported"),
-            Value::Null => "null".to_string(),
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Value::Number(val) => val.to_string(),
+                Value::String(val) => val.to_string(),
+                Value::Boolean(val) => val.to_string(),
+                Value::Function(_) => format!("Printing Functions Not Supported"),
+                Value::Null => "null".to_string(),
+            }
+        )
     }
 }
 
@@ -293,7 +296,7 @@ impl Value {
                 } else {
                     Value::Number(a % b)
                 }
-            },
+            }
             (Value::Number(a), Value::Boolean(b)) => {
                 let b_as_f64 = if *b { 1.0 } else { 0.0 };
                 if b_as_f64 == 0.0 {
@@ -301,7 +304,7 @@ impl Value {
                 } else {
                     Value::Number(a % b_as_f64)
                 }
-            },
+            }
             (Value::Boolean(a), Value::Number(b)) => {
                 let a_as_f64 = if *a { 1.0 } else { 0.0 };
                 if *b == 0.0 {
@@ -309,7 +312,7 @@ impl Value {
                 } else {
                     Value::Number(a_as_f64 % b)
                 }
-            },
+            }
             (Value::Boolean(a), Value::Boolean(b)) => {
                 let a_as_f64 = if *a { 1.0 } else { 0.0 };
                 let b_as_f64 = if *b { 1.0 } else { 0.0 };
@@ -318,11 +321,10 @@ impl Value {
                 } else {
                     Value::Number(a_as_f64 % b_as_f64)
                 }
-            },
+            }
             _ => panic!("Modulo operation not supported for non-numeric types"),
         }
     }
-
 }
 
 struct Enviorment {
@@ -418,7 +420,9 @@ impl Runtime {
             StatementValue::VariableStmt(decleration) => {
                 self.declare_variable(decleration, scoped_enviorment)
             }
-            StatementValue::IfStmt(if_statement) => self.if_statement(if_statement, scoped_enviorment),
+            StatementValue::IfStmt(if_statement) => {
+                self.if_statement(if_statement, scoped_enviorment)
+            }
             StatementValue::BlockStmt(block_statement) => {
                 self.block_statement(block_statement, scoped_enviorment)
             }
@@ -505,7 +509,9 @@ impl Runtime {
                         &self.evaluate_expression(&*expression.right, scoped_enviorment.clone()),
                     ),
             ),
-            BinOp::Modulo => self.evaluate_expression(&*expression.left, scoped_enviorment.clone()).modulo(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone())),
+            BinOp::Modulo => self
+                .evaluate_expression(&*expression.left, scoped_enviorment.clone())
+                .modulo(&self.evaluate_expression(&*expression.right, scoped_enviorment.clone())),
             BinOp::GreaterThan => Value::Boolean(
                 self.evaluate_expression(&*expression.left, scoped_enviorment.clone())
                     .greater_than(
@@ -754,7 +760,6 @@ impl Runtime {
     fn finished(&mut self) -> bool {
         self.position >= self.ast.body.len()
     }
-
 
     fn error(&self, message: &str) -> ! {
         panic!("Runtime ERROR\nLine:{}\n{}", *self.line.borrow(), message)

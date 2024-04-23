@@ -8,12 +8,11 @@ mod runtime;
 use runtime::Runtime;
 use std::env;
 
-
 fn main() {
     let args: Vec<String> = env::args().collect();
     let file_name = match args.get(1) {
         Some(arg) => arg,
-        None => panic!("Please provide a file to run via the command line")
+        None => panic!("Please provide a file to run via the command line"),
     };
 
     println!("{}", file_name);
@@ -24,10 +23,9 @@ fn main() {
     // println!("Tokens:\n{:?}", tokens);
 
     let ast = Parser::new(tokens.clone()).parse();
-    
-    println!("\nAST:\n{:?}",parser::Parser::new(tokens.clone()).parse());
+
+    println!("\nAST:\n{:?}", parser::Parser::new(tokens.clone()).parse());
 
     let mut runtime = Runtime::new(ast);
     runtime.run();
-
 }
