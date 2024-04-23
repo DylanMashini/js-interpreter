@@ -4,6 +4,10 @@ pub enum Token {
     If,
     Else,
     Let,
+    While,
+    For,
+    Function,
+    Return, 
 
     Identifier(String),
 
@@ -35,7 +39,11 @@ pub enum Token {
     Minus,
     Multiply,
     Divide,
+    DoublePlus,
+    DoubleMinus,
     Semicolon,
+    Or,
+    And,
     EOL,
 }
 
@@ -94,7 +102,7 @@ impl Lexer {
                             '.' => tokens.push(Token::Dot),
                             ',' => tokens.push(Token::Comma),
                             ';' => tokens.push(Token::Semicolon),
-                            '>' | '<' | '=' | '!' | '+' | '-' | '*' | '/'  => {
+                            '>' | '<' | '=' | '!' | '+' | '-' | '*' | '/' | '|' | '&'  => {
                                 current_token.push(c);
                                 self.state = State::InOperator
                             },
@@ -124,6 +132,10 @@ impl Lexer {
                                     "undefined" => tokens.push(Token::Undefined),
                                     "true" => tokens.push(Token::Boolean(true)),
                                     "false" => tokens.push(Token::Boolean(false)),
+                                    "while" => tokens.push(Token::While),
+                                    "for" => tokens.push(Token::For),
+                                    "function" => tokens.push(Token::Function),
+                                    "return" => tokens.push(Token::Return),
                                     _ => tokens.push(Token::Identifier(current_token.clone())),
                                 }
                                 current_token.clear();
@@ -142,7 +154,7 @@ impl Lexer {
                         },
                         State::InOperator => {
                             match c {
-                                '=' => {
+                                '=' | '+' | '-' | '|' | '&' => {
                                     current_token.push(c);
                                 }
                                 _ => {
@@ -158,8 +170,12 @@ impl Lexer {
                                         "!=" => tokens.push(Token::NotEqual),
                                         "+" => tokens.push(Token::Plus),
                                         "-" => tokens.push(Token::Minus),
+                                        "++" => tokens.push(Token::DoublePlus),
+                                        "--" => tokens.push(Token::DoubleMinus),
                                         "*" => tokens.push(Token::Multiply),
                                         "/" => tokens.push(Token::Divide),
+                                        "||" => tokens.push(Token::Or),
+                                        "&&" => tokens.push(Token::And),
                                         _ => unreachable!("Match statement should be exhaustive")
 
                                     }
@@ -183,4 +199,3 @@ impl Lexer {
     }
 
 }
-

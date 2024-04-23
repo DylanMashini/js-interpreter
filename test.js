@@ -1,9 +1,11 @@
-let test = 0.5;
+function add(a, b, c) {
+    return a + b + c
+}
 
-let test2 = 1
+print(add(5, 5, 5))
 
-if (test2 > test1) {
-    (10 + 9)
-} else {
-    
+print("Hello World")
+
+for (let i = 0; i < 5; i++) {
+    print("Number: " + i)
 }

@@ -1,6 +1,5 @@
-#![allow(dead_code)]
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 pub enum Node {
     Literal(Literal),
     Identifier(String),
@@ -9,7 +8,7 @@ pub enum Node {
     Program(Vec<Statement>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Number(f64),
     String(String),
@@ -17,26 +16,37 @@ pub enum Literal {
     Null,
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 pub enum Expression {
     BinaryExpr(BinaryExpr),
     UnaryExpr(UnaryExpr),
     CallExpr(CallExpr),
     LiteralExpr(Literal),
-    Identifier(String)
+    Identifier(String),
+    Increment(String), // String is identifier
+    Decrement(String)
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 pub struct CallExpr {
-    callee: Box<Node>,
-    arguments: Vec<Node>,
+    pub callee: String,
+    pub arguments: Vec<Expression>,
 }
 
-#[derive(Debug)]
+impl CallExpr {
+    pub fn new(callee: String, arguments: Vec<Expression>) -> CallExpr {
+        CallExpr {
+            callee,
+            arguments
+        }
+    }
+}
+
+#[derive(Debug,Clone,PartialEq)]
 pub struct BinaryExpr {
-    left: Box<Expression>,
-    operator: BinOp,
-    right: Box<Expression>,
+    pub left: Box<Expression>,
+    pub operator: BinOp,
+    pub right: Box<Expression>,
 }
 
 impl BinaryExpr {
@@ -49,7 +59,8 @@ impl BinaryExpr {
     }
 }
 
-#[derive(Debug)]
+
+#[derive(Debug,Clone,PartialEq)]
 pub enum BinOp {
     Add,
     Subtract,
@@ -61,12 +72,15 @@ pub enum BinOp {
     GreaterThanEqual,
     EqualTo,
     NotEqual,
+    LogicalOr,
+    LogicalAnd,
+    Assign,
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 pub struct UnaryExpr {
-    operator: UnOp,
-    operand: Box<Expression>,
+    pub operator: UnOp,
+    pub operand: Box<Expression>,
 }
 
 impl UnaryExpr {
@@ -78,26 +92,30 @@ impl UnaryExpr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 pub enum UnOp {
     Negate,
     Not,
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 pub enum Statement {
     ExpressionStmt(Expression),
     BlockStmt(Vec<Statement>),
     IfStmt(IfStmt),
     VariableStmt(VariableDecleration),
+    WhileStmt(WhileStmt),
+    ForStmt(ForStmt),
+    FunctionDecleration(FuncDecleration),
+    ReturnStatement(Expression),
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 pub struct VariableDecleration {
-    id: String,
+    pub id: String,
     // Boxed to prevent recursive types
-    init: Option<Box<Expression>>,
+    pub init: Option<Box<Expression>>,
 }
 
 impl VariableDecleration {
@@ -106,11 +124,11 @@ impl VariableDecleration {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
 pub struct IfStmt {
-    condition: Box<Expression>,
-    consequent: Box<Statement>,
-    alternate: Option<Box<Statement>>,
+    pub condition: Box<Expression>,
+    pub consequent: Box<Statement>,
+    pub alternate: Option<Box<Statement>>,
 }
 
 impl IfStmt {
@@ -123,9 +141,61 @@ impl IfStmt {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,PartialEq)]
+pub struct WhileStmt {
+    pub condition: Expression,
+    pub body: Box<Statement>
+}
+
+impl WhileStmt {
+    pub fn new(condition: Expression, body: Box<Statement>) -> WhileStmt {
+        WhileStmt {
+            condition,
+            body
+        }
+    }
+}
+
+
+#[derive(Debug,Clone,PartialEq)]
+pub struct ForStmt {
+    pub initialization: Box<Statement>,
+    pub condition: Expression,
+    pub afterthought: Box<Statement>,
+    pub body: Box<Statement>
+}
+
+impl ForStmt {
+    pub fn new(initialization: Box<Statement>, condition: Expression, afterthought: Box<Statement>, body: Box<Statement>) -> ForStmt {
+        ForStmt {
+            initialization,
+            condition,
+            afterthought,
+            body
+        }
+    }
+}
+
+#[derive(Debug,Clone,PartialEq)]
+pub struct FuncDecleration {
+    pub id: String,
+    pub parameters: Vec<String>,
+    pub body: Box<Statement>,
+}
+
+impl FuncDecleration {
+    pub fn new(id: String, parameters: Vec<String>, body: Box<Statement>) -> FuncDecleration {
+        FuncDecleration {
+            id,
+            parameters,
+            body,
+        }
+    }
+}
+
+#[derive(Debug,Clone,PartialEq)]
 pub struct Program {
-    body: Vec<Statement>,
+    pub body: Vec<Statement>,
 }
 
 impl Program {
