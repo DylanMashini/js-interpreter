@@ -15,6 +15,7 @@ pub enum Expression {
     Identifier(String),
     Increment(String), // String is identifier
     Decrement(String),
+    DotExpr(DotExpr),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -80,6 +81,18 @@ impl UnaryExpr {
 pub enum UnOp {
     Negate,
     Not,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DotExpr {
+    pub object: Box<Expression>,
+    pub property: Box<Expression>,
+}
+
+impl DotExpr {
+    pub fn new(object: Box<Expression>, property: Box<Expression>) -> DotExpr {
+        DotExpr { object, property }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,8 +1,6 @@
-#![allow(dead_code)]
-
 use crate::ast::{
-    BinOp, BinaryExpr, CallExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program,
-    Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
+    BinOp, BinaryExpr, CallExpr, DotExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal,
+    Program, Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
 };
 use core::fmt;
 use std::{
@@ -24,12 +22,27 @@ impl Function {
 }
 
 #[derive(Clone, PartialEq)]
+struct Object {
+    pub fields: HashMap<String, Value>,
+}
+
+impl Object {
+    pub fn new(fields: HashMap<String, Value>) -> Object {
+        Object { fields }
+    }
+    pub fn get_property(&self, id: String) -> &Value {
+        self.fields.get(&id).unwrap_or(&Value::Null)
+    }
+}
+
+#[derive(Clone, PartialEq)]
 enum Value {
     Number(f64),
     String(String),
     Boolean(bool),
     Function(Function),
     Null,
+    Object(Object),
 }
 
 impl fmt::Debug for Value {
@@ -43,6 +56,7 @@ impl fmt::Debug for Value {
                 Value::Boolean(val) => val.to_string(),
                 Value::Function(_) => format!("Printing Functions Not Supported"),
                 Value::Null => "null".to_string(),
+                _ => todo!(),
             }
         )
     }
@@ -57,6 +71,7 @@ impl Value {
                 Value::Boolean(b) => return Value::Number(n + (*b as i8) as f64),
                 Value::Null => return Value::Number(*n),
                 Value::Function(_) => panic!("Can not add a function"),
+                _ => todo!(),
             },
             Value::String(str1) => match other {
                 Value::Number(n2) => return Value::String(str1.to_owned() + &n2.to_string()),
@@ -64,6 +79,7 @@ impl Value {
                 Value::Boolean(b2) => return Value::String(str1.to_owned() + &b2.to_string()),
                 Value::Null => return Value::String(str1.to_owned() + "null"),
                 Value::Function(_) => panic!("Can not add a function"),
+                _ => todo!(),
             },
             Value::Boolean(b1) => match other {
                 Value::Number(n2) => return Value::Number((*b1 as i8) as f64 + n2),
@@ -71,9 +87,11 @@ impl Value {
                 Value::Boolean(b2) => return Value::Number(((*b1 as i8) + (*b2 as i8)) as f64),
                 Value::Null => return Value::Boolean(*b1),
                 Value::Function(_) => panic!("Can not add a function"),
+                _ => todo!(),
             },
             Value::Function(_) => panic!("Can not add a function"),
             Value::Null => todo!("Im lazy"),
+            _ => todo!(),
         }
     }
 
@@ -269,6 +287,7 @@ impl Value {
             Value::Boolean(b) => *b,
             Value::Null => false,
             Value::Function(_) => true, // Functions are always truthy
+            _ => todo!(),
         }
     }
 
@@ -334,10 +353,27 @@ struct Enviorment {
 
 impl Enviorment {
     pub fn new(parent: Option<Weak<RefCell<Enviorment>>>) -> Enviorment {
-        Enviorment {
-            variables: HashMap::new(),
-            parent,
-        }
+        let mut console = Object::new(HashMap::new());
+
+        console.fields.insert(
+            "log".to_string(),
+            Value::Function(Function::new(
+                vec!["print-value".to_string()],
+                Statement::new(
+                    StatementValue::ExpressionStmt(Expression::CallExpr(CallExpr::new(
+                        "print".to_string(),
+                        vec![Expression::Identifier("print-value".to_string())],
+                    ))),
+                    22,
+                ),
+            )),
+        );
+
+        let mut variables: HashMap<String, Value> = HashMap::new();
+
+        variables.insert("console".to_string(), Value::Object(console));
+
+        Enviorment { variables, parent }
     }
 
     pub fn assign_variable(&mut self, id: String, value: Value) {
@@ -480,6 +516,9 @@ impl Runtime {
                 ),
                 scoped_enviorment,
             ),
+            Expression::DotExpr(dot_expr) => {
+                self.evaluate_dot_expression(dot_expr, scoped_enviorment)
+            }
         };
 
         val
@@ -714,6 +753,31 @@ impl Runtime {
         };
     }
 
+    fn invoke_method(
+        &self,
+        function_call: &CallExpr,
+        object: &Object,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) -> Value {
+        // Guard to make sure that Method actually exists on object
+        match object
+            .fields
+            .get(&function_call.callee)
+            .unwrap_or(&Value::Null)
+        {
+            Value::Function(_) => (),
+            _ => panic!("Method Not Callable on Object"),
+        };
+
+        let env = Rc::new(RefCell::new(Enviorment::new(Some(
+            Rc::<RefCell<Enviorment>>::downgrade(&scoped_enviorment),
+        ))));
+
+        env.borrow_mut().variables = object.fields.clone();
+
+        self.invoke_function(function_call, env)
+    }
+
     fn print(&self, function_call: &CallExpr, scoped_enviorment: Rc<RefCell<Enviorment>>) {
         println!(
             "{:?}",
@@ -754,6 +818,53 @@ impl Runtime {
         {
             self.execute_statement(&for_statement.body, scoped_enviorment.clone());
             self.execute_statement(&for_statement.afterthought, scoped_enviorment.clone());
+        }
+    }
+
+    fn evaluate_dot_expression(
+        &self,
+        dot_expression: &DotExpr,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) -> Value {
+        let obj_id = match &*dot_expression.object {
+            Expression::Identifier(id) => id,
+            _ => panic!("LEFT HAND OF DOT EXPR MUST BE ID"),
+        };
+
+        let object = match scoped_enviorment.borrow().get_variable(obj_id) {
+            Value::Object(obj) => obj,
+            _ => panic!("Can not use dot expression with non-object value"),
+        };
+
+        match &*dot_expression.property {
+            Expression::Identifier(id) => object.get_property(id.clone()).clone(),
+            Expression::DotExpr(expr) => self.evaluate_accessor(expr, &object, scoped_enviorment),
+            Expression::CallExpr(expr) => self.invoke_method(expr, &object, scoped_enviorment),
+            _ => panic!("IDK THIS SHOULDN'T HAPPEN"),
+        }
+    }
+
+    fn evaluate_accessor(
+        &self,
+        dot_expression: &DotExpr,
+        object: &Object,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) -> Value {
+        let id = match &*dot_expression.object {
+            Expression::Identifier(id) => id,
+            _ => panic!("Left hand of Dot Expr must be ID"),
+        };
+
+        let val = match object.get_property(id.clone()) {
+            Value::Object(obj) => obj,
+            _ => panic!("left hand must eval to Object"),
+        };
+
+        match &*dot_expression.property {
+            Expression::DotExpr(expr) => self.evaluate_accessor(expr, val, scoped_enviorment),
+            Expression::Identifier(id) => return val.get_property(id.clone()).clone(),
+            Expression::CallExpr(expr) => return self.invoke_method(expr, val, scoped_enviorment),
+            _ => panic!("Dot Expression Right Side MUST be DotExpr or ID"),
         }
     }
 

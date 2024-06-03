@@ -1,6 +1,6 @@
 use crate::ast::{
-    BinOp, BinaryExpr, CallExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program,
-    Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
+    BinOp, BinaryExpr, CallExpr, DotExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal,
+    Program, Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
 };
 
 use crate::lexer::{Token, TokenValue};
@@ -499,7 +499,7 @@ impl Parser {
     }
 
     fn call_expression(&mut self) -> Expression {
-        let expr = self.primary();
+        let expr = self.dot_expression();
 
         match expr {
             Expression::Identifier(id) => {
@@ -526,6 +526,29 @@ impl Parser {
             }
             _ => expr,
         }
+    }
+
+    fn dot_expression(&mut self) -> Expression {
+        let expr = self.bracket_expression();
+
+        match expr {
+            Expression::Identifier(_) => {
+                // Left must be identifier to be a dot expression
+                if self.match_token_consume(TokenValue::Dot).is_some() {
+                    let right = self.expression();
+                    return Expression::DotExpr(DotExpr::new(Box::new(expr), Box::new(right)));
+                } else {
+                    expr
+                }
+            }
+            _ => expr,
+        }
+    }
+    // TODO: Add Bracket Expressions
+    fn bracket_expression(&mut self) -> Expression {
+        let expr = self.primary();
+
+        expr
     }
 
     fn primary(&mut self) -> Expression {
