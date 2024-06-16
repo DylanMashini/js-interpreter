@@ -1,1 +1,1 @@
-console.log("TEST");
+let arr = ["el1", "el2"];

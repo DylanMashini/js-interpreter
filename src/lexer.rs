@@ -44,6 +44,7 @@ pub enum TokenValue {
     RParentheses,
     Dot,
     Comma,
+    Colon,
     Not,
     Equal,
     DoubleEqual,
@@ -124,6 +125,7 @@ impl Lexer {
                             '%' => tokens.push(Token::new(TokenValue::Modulo, line_num + 1)),
                             ',' => tokens.push(Token::new(TokenValue::Comma, line_num + 1)),
                             ';' => tokens.push(Token::new(TokenValue::Semicolon, line_num + 1)),
+                            ':' => tokens.push(Token::new(TokenValue::Colon, line_num + 1)),
                             '>' | '<' | '=' | '!' | '+' | '-' | '*' | '/' | '|' | '&' => {
                                 current_token.push(c);
                                 self.state = State::InOperator

@@ -2,6 +2,10 @@ use crate::ast::{
     BinOp, BinaryExpr, CallExpr, DotExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal,
     Program, Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
 };
+
+use crate::console::log;
+use crate::math::get_math_module;
+
 use core::fmt;
 use std::{
     cell::RefCell,
@@ -9,20 +13,31 @@ use std::{
     rc::{Rc, Weak},
 };
 
+type RustFunc = fn(Vec<Value>) -> Value;
+
 #[derive(Debug, Clone, PartialEq)]
-struct Function {
-    arguments: Vec<String>,
-    body: Statement,
+pub enum FunctionBody {
+    RustFunc(RustFunc),
+    JSFunc(Statement),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Function {
+    pub arguments: Vec<String>,
+    pub body: FunctionBody,
 }
 
 impl Function {
     pub fn new(arguments: Vec<String>, body: Statement) -> Function {
-        Function { arguments, body }
+        Function {
+            arguments,
+            body: FunctionBody::JSFunc(body),
+        }
     }
 }
 
 #[derive(Clone, PartialEq)]
-struct Object {
+pub struct Object {
     pub fields: HashMap<String, Value>,
 }
 
@@ -36,7 +51,7 @@ impl Object {
 }
 
 #[derive(Clone, PartialEq)]
-enum Value {
+pub enum Value {
     Number(f64),
     String(String),
     Boolean(bool),
@@ -271,15 +286,6 @@ impl Value {
         !self.equals(other)
     }
 
-    pub fn from_literal(literal: &Literal) -> Value {
-        match literal {
-            Literal::Boolean(b) => return Value::Boolean(*b),
-            Literal::Number(n) => return Value::Number(*n),
-            Literal::String(s) => return Value::String(s.clone()),
-            Literal::Null => return Value::Null,
-        }
-    }
-
     fn is_truthy(&self) -> bool {
         match self {
             Value::Number(n) => *n != 0.0 && !n.is_nan(),
@@ -353,25 +359,22 @@ struct Enviorment {
 
 impl Enviorment {
     pub fn new(parent: Option<Weak<RefCell<Enviorment>>>) -> Enviorment {
-        let mut console = Object::new(HashMap::new());
-
-        console.fields.insert(
-            "log".to_string(),
-            Value::Function(Function::new(
-                vec!["print-value".to_string()],
-                Statement::new(
-                    StatementValue::ExpressionStmt(Expression::CallExpr(CallExpr::new(
-                        "print".to_string(),
-                        vec![Expression::Identifier("print-value".to_string())],
-                    ))),
-                    22,
-                ),
-            )),
-        );
-
         let mut variables: HashMap<String, Value> = HashMap::new();
 
-        variables.insert("console".to_string(), Value::Object(console));
+        if parent.is_none() {
+            let mut console = Object::new(HashMap::new());
+
+            console.fields.insert(
+                "log".to_string(),
+                Value::Function(Function {
+                    arguments: vec!["val".to_string()],
+                    body: FunctionBody::RustFunc(log),
+                }),
+            );
+
+            variables.insert("console".to_string(), Value::Object(console));
+            variables.insert("Math".to_string(), get_math_module());
+        }
 
         Enviorment { variables, parent }
     }
@@ -490,7 +493,9 @@ impl Runtime {
                 self.evaluate_unary_expression(un_exp, scoped_enviorment)
             }
             Expression::CallExpr(call_exp) => self.invoke_function(call_exp, scoped_enviorment),
-            Expression::LiteralExpr(lit_exp) => Value::from_literal(lit_exp),
+            Expression::LiteralExpr(lit_exp) => {
+                self.evaluate_literal_expression(lit_exp, scoped_enviorment)
+            }
             Expression::Identifier(id) => self.evaluate_identifier(id, scoped_enviorment),
             Expression::Increment(id) => self.evaluate_binary_expression(
                 &BinaryExpr::new(
@@ -522,6 +527,30 @@ impl Runtime {
         };
 
         val
+    }
+
+    fn evaluate_literal_expression(
+        &self,
+        expression: &Literal,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) -> Value {
+        match expression {
+            Literal::Boolean(b) => return Value::Boolean(*b),
+            Literal::Number(n) => return Value::Number(*n),
+            Literal::String(s) => return Value::String(s.clone()),
+            Literal::Null => return Value::Null,
+            Literal::Json(obj) => {
+                let mut obj_value: HashMap<String, Value> = HashMap::new();
+
+                for (key, expr) in obj {
+                    let value = self.evaluate_expression(expr, scoped_enviorment.clone());
+                    obj_value.insert(key.clone(), value);
+                }
+
+                return Value::Object(Object::new(obj_value));
+            }
+            _ => todo!(),
+        }
     }
 
     fn evaluate_binary_expression(
@@ -713,10 +742,6 @@ impl Runtime {
         function_call: &CallExpr,
         scoped_enviorment: Rc<RefCell<Enviorment>>,
     ) -> Value {
-        if function_call.callee == "print" {
-            self.print(function_call, scoped_enviorment);
-            return Value::Null;
-        }
         if let Value::Function(callee) = scoped_enviorment
             .borrow()
             .get_variable(&function_call.callee)
@@ -724,6 +749,10 @@ impl Runtime {
             if function_call.arguments.len() != callee.arguments.len() {
                 panic!("Arguments don't match up");
             }
+
+            let mut arg_values: Vec<Value> = Vec::new();
+            arg_values.reserve(callee.arguments.len());
+
             let scope = Rc::new(RefCell::new(Enviorment::new(Some(
                 Rc::<RefCell<Enviorment>>::downgrade(&scoped_enviorment.clone()),
             ))));
@@ -731,23 +760,29 @@ impl Runtime {
             scope
                 .borrow_mut()
                 .create_variable("return-value".to_string(), None);
-            for (arg_name, arg_expression) in
-                callee.arguments.iter().zip(function_call.arguments.iter())
-            {
+            for arg_expression in function_call.arguments.iter() {
                 let arg_value = self.evaluate_expression(arg_expression, scoped_enviorment.clone());
-                scope
-                    .borrow_mut()
-                    .create_variable(arg_name.clone(), Some(arg_value));
+                arg_values.push(arg_value);
             }
+            return match &callee.body {
+                FunctionBody::JSFunc(body) => {
+                    for (arg_value, arg_name) in arg_values.iter().zip(callee.arguments.iter()) {
+                        scope
+                            .borrow_mut()
+                            .create_variable(arg_name.clone(), Some(arg_value.clone()));
+                    }
 
-            self.execute_statement(&callee.body, scope.clone());
+                    self.execute_statement(body, scope.clone());
 
-            return scope
-                .borrow()
-                .variables
-                .get("return-value")
-                .expect("Should Always exist")
-                .clone();
+                    return scope
+                        .borrow()
+                        .variables
+                        .get("return-value")
+                        .expect("Should Always exist")
+                        .clone();
+                }
+                FunctionBody::RustFunc(func) => (func)(arg_values),
+            };
         } else {
             self.error("Function Not Found")
         };
@@ -776,13 +811,6 @@ impl Runtime {
         env.borrow_mut().variables = object.fields.clone();
 
         self.invoke_function(function_call, env)
-    }
-
-    fn print(&self, function_call: &CallExpr, scoped_enviorment: Rc<RefCell<Enviorment>>) {
-        println!(
-            "{:?}",
-            self.evaluate_expression(&function_call.arguments[0], scoped_enviorment)
-        );
     }
 
     fn return_statement(
@@ -840,7 +868,7 @@ impl Runtime {
             Expression::Identifier(id) => object.get_property(id.clone()).clone(),
             Expression::DotExpr(expr) => self.evaluate_accessor(expr, &object, scoped_enviorment),
             Expression::CallExpr(expr) => self.invoke_method(expr, &object, scoped_enviorment),
-            _ => panic!("IDK THIS SHOULDN'T HAPPEN"),
+            _ => panic!("IDK THIS SHOULDN'T HAPPEN: {:?}", dot_expression.property),
         }
     }
 

@@ -7,6 +7,8 @@ use parser::Parser;
 mod runtime;
 use runtime::Runtime;
 use std::env;
+mod console;
+mod math;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -20,7 +22,7 @@ fn main() {
     // println!("Source Code: \n\n{}\n", contents);
     let mut lexer = Lexer::new(contents);
     let tokens = lexer.tokenize();
-    // println!("Tokens:\n{:?}", tokens);
+    println!("Tokens:\n{:?}", tokens);
 
     let ast = Parser::new(tokens.clone()).parse();
 

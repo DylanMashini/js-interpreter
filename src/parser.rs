@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::ast::{
     BinOp, BinaryExpr, CallExpr, DotExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal,
     Program, Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
@@ -583,8 +585,71 @@ impl Parser {
                 self.consume(TokenValue::RParentheses, "Expect ')' after expression."); // Ensure closing ')'
                 expr // The expression is the result
             }
+            TokenValue::LCurlyBracket => self.object_literal(),
+            TokenValue::LBracket => self.array_literal(),
             _ => panic!("Unexpected token: {:?}", self.peek()), // Error handling for unexpected tokens
         }
+    }
+
+    fn object_literal(&mut self) -> Expression {
+        let mut object = HashMap::new();
+
+        self.consume(
+            TokenValue::LCurlyBracket,
+            "Object must start with LCurlyBracket",
+        );
+
+        if self.peek().value != TokenValue::RCurlyBracket {
+            loop {
+                self.match_token_consume(TokenValue::EOL);
+
+                if let TokenValue::Identifier(key) = self.peek().value.clone() {
+                    self.advance();
+                    self.consume(
+                        TokenValue::Colon,
+                        "Key must be followed by colon in object literal",
+                    );
+                    let value = self.expression();
+
+                    object.insert(key, value);
+
+                    self.match_token_consume(TokenValue::EOL);
+
+                    if self
+                        .match_token_consume(TokenValue::RCurlyBracket)
+                        .is_some()
+                    {
+                        break;
+                    }
+
+                    self.consume(TokenValue::Comma, "Expected Comma or Closing Brace");
+                }
+            }
+        }
+
+        Expression::LiteralExpr(Literal::Json(object))
+    }
+
+    fn array_literal(&mut self) -> Expression {
+        let mut arr = Vec::new();
+
+        self.consume(TokenValue::LBracket, "Array Must start with [");
+
+        while !matches!(self.peek().value, TokenValue::RBracket) {
+            arr.push(self.expression());
+
+            if self.match_token_consume(TokenValue::Comma).is_none() {
+                self.consume(
+                    TokenValue::RBracket,
+                    "If there isn't a comma, the array must end",
+                );
+            }
+        }
+        if self.peek().value == TokenValue::Semicolon || self.peek().value == TokenValue::EOL {
+            self.advance();
+        }
+
+        Expression::LiteralExpr(Literal::Array(arr))
     }
 
     fn current_operator(&self) -> Option<Token> {

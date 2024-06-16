@@ -1,8 +1,12 @@
+use std::collections::HashMap;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Number(f64),
     String(String),
     Boolean(bool),
+    Json(HashMap<String, Expression>),
+    Array(Vec<Expression>),
     Null,
 }
 
