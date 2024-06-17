@@ -28,6 +28,8 @@ fn main() {
 
     println!("\nAST:\n{:?}", parser::Parser::new(tokens.clone()).parse());
 
+    // print!("\x1B[2J\x1B[1;1H");
+
     let mut runtime = Runtime::new(ast);
     runtime.run();
 }

@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{
-    BinOp, BinaryExpr, CallExpr, DotExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal,
-    Program, Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
+    BinOp, BinaryExpr, BracketExpr, CallExpr, DotExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program, Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt
 };
 
 use crate::lexer::{Token, TokenValue};
@@ -546,9 +545,25 @@ impl Parser {
             _ => expr,
         }
     }
-    // TODO: Add Bracket Expressions
+
     fn bracket_expression(&mut self) -> Expression {
-        let expr = self.primary();
+        let mut expr = self.primary();
+
+        if self.match_token_consume(TokenValue::LBracket).is_some() {
+            // expr can be identifier, array, or object
+            match expr {
+                Expression::Identifier(id) => expr = Expression::BracketExpression(BracketExpr::new(Box::new(Expression::Identifier(id)), Box::new(self.expression()))),
+                Expression::LiteralExpr(literal_expr) => {
+                    if matches!(literal_expr, Literal::Array(_)) || matches!(literal_expr, Literal::Json(_)) {
+                        expr = Expression::BracketExpression(BracketExpr::new(Box::new(Expression::LiteralExpr(literal_expr)), Box::new(self.expression())));
+                    } else {
+                        panic!("Bracket Expression Invalid")
+                    };
+                }
+                _ => panic!("Bracket Expression Invalid")
+            }
+            self.consume(TokenValue::RBracket, "Bracket Expression must end with RBracket");
+        }
 
         expr
     }
@@ -615,6 +630,9 @@ impl Parser {
 
                     self.match_token_consume(TokenValue::EOL);
 
+                    self.match_token_consume(TokenValue::Comma);
+                    self.match_token_consume(TokenValue::EOL);
+
                     if self
                         .match_token_consume(TokenValue::RCurlyBracket)
                         .is_some()
@@ -622,7 +640,6 @@ impl Parser {
                         break;
                     }
 
-                    self.consume(TokenValue::Comma, "Expected Comma or Closing Brace");
                 }
             }
         }

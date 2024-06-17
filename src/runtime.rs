@@ -1,6 +1,5 @@
 use crate::ast::{
-    BinOp, BinaryExpr, CallExpr, DotExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal,
-    Program, Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt,
+    BinOp, BinaryExpr, BracketExpr, CallExpr, DotExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program, Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt
 };
 
 use crate::console::log;
@@ -58,6 +57,7 @@ pub enum Value {
     Function(Function),
     Null,
     Object(Object),
+    Array(Vec<Value>),
 }
 
 impl fmt::Debug for Value {
@@ -71,7 +71,9 @@ impl fmt::Debug for Value {
                 Value::Boolean(val) => val.to_string(),
                 Value::Function(_) => format!("Printing Functions Not Supported"),
                 Value::Null => "null".to_string(),
-                _ => todo!(),
+                // TODO: Properly Format array output
+                Value::Array(arr) => format!("{:?}", arr),
+                Value::Object(obj) => format!("{:?}", obj.fields),
             }
         )
     }
@@ -522,7 +524,10 @@ impl Runtime {
                 scoped_enviorment,
             ),
             Expression::DotExpr(dot_expr) => {
-                self.evaluate_dot_expression(dot_expr, scoped_enviorment)
+                self.evaluate_dot_expression(dot_expr, scoped_enviorment) 
+            },
+            Expression::BracketExpression(bracket_expr) => {
+                self.evaluate_bracket_expression(bracket_expr, scoped_enviorment)
             }
         };
 
@@ -548,7 +553,15 @@ impl Runtime {
                 }
 
                 return Value::Object(Object::new(obj_value));
-            }
+            },
+            Literal::Array(exprs) => {
+                let mut arr: Vec<Value>= Vec::new();
+                for expr in exprs {
+                    arr.push(self.evaluate_expression(expr, scoped_enviorment.clone()));
+                };
+
+                Value::Array(arr)
+            },
             _ => todo!(),
         }
     }
@@ -849,11 +862,38 @@ impl Runtime {
         }
     }
 
+    fn evaluate_bracket_expression(&self, bracket_expression: &BracketExpr, scoped_enviorment: Rc<RefCell<Enviorment>>) -> Value {
+        // TODO: Support Literals on left hand of dot expr
+        let property = self.evaluate_expression(&bracket_expression.property, scoped_enviorment.clone());
+
+        match property {
+            Value::String(_) => self.evaluate_dot_expression(&DotExpr::new(bracket_expression.object.clone(), bracket_expression.property.clone()), scoped_enviorment),
+            Value::Number(num) => {
+                if num.fract() != 0.0 || num > usize::MAX as f64 {
+                    panic!("Index in bracket expression MUST be integer");
+                }
+                let i = num as usize;
+                // object must be String or array
+                let object = self.evaluate_expression(&bracket_expression.object, scoped_enviorment);
+
+                match object {
+                    // TODO: Return unndefined
+                    Value::String(str) => return Value::String(str.chars().nth(i).expect("Index must be in bounds of String").to_string()),
+                    Value::Array(arr) => return arr.get(i).unwrap_or(&Value::Null).clone(),
+                    _ => panic!("Can not index into type other than string or array"),
+                }
+            },
+            _ => panic!("Only Strings or Indexes are supported in bracket expression")
+        }
+
+    }
+
     fn evaluate_dot_expression(
         &self,
         dot_expression: &DotExpr,
         scoped_enviorment: Rc<RefCell<Enviorment>>,
     ) -> Value {
+        // TODO: Support Literals on left hand of dot expr
         let obj_id = match &*dot_expression.object {
             Expression::Identifier(id) => id,
             _ => panic!("LEFT HAND OF DOT EXPR MUST BE ID"),

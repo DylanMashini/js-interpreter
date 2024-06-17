@@ -20,6 +20,7 @@ pub enum Expression {
     Increment(String), // String is identifier
     Decrement(String),
     DotExpr(DotExpr),
+    BracketExpression(BracketExpr),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -96,6 +97,18 @@ pub struct DotExpr {
 impl DotExpr {
     pub fn new(object: Box<Expression>, property: Box<Expression>) -> DotExpr {
         DotExpr { object, property }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BracketExpr {
+    pub object: Box<Expression>,
+    pub property: Box<Expression>,
+}
+
+impl BracketExpr {
+    pub fn new(object: Box<Expression>, property: Box<Expression>) -> BracketExpr {
+        BracketExpr { object, property }
     }
 }
 
