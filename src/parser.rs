@@ -637,14 +637,12 @@ impl Parser {
 
         while !matches!(self.peek().value, TokenValue::RBracket) {
             arr.push(self.expression());
-
             if self.match_token_consume(TokenValue::Comma).is_none() {
-                self.consume(
-                    TokenValue::RBracket,
-                    "If there isn't a comma, the array must end",
-                );
+                break;
             }
         }
+        self.consume(TokenValue::RBracket, "Array Must End With RBracket");
+
         if self.peek().value == TokenValue::Semicolon || self.peek().value == TokenValue::EOL {
             self.advance();
         }
