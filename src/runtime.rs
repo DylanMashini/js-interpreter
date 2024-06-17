@@ -867,7 +867,7 @@ impl Runtime {
         let property = self.evaluate_expression(&bracket_expression.property, scoped_enviorment.clone());
 
         match property {
-            Value::String(_) => self.evaluate_dot_expression(&DotExpr::new(bracket_expression.object.clone(), bracket_expression.property.clone()), scoped_enviorment),
+            Value::String(str) => self.evaluate_dot_expression(&DotExpr::new(bracket_expression.object.clone(), Box::new(Expression::Identifier(str))), scoped_enviorment),
             Value::Number(num) => {
                 if num.fract() != 0.0 || num > usize::MAX as f64 {
                     panic!("Index in bracket expression MUST be integer");
