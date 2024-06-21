@@ -108,6 +108,14 @@ impl Value {
             },
             Value::Function(_) => panic!("Can not add a function"),
             Value::Null => todo!("Im lazy"),
+            Value::Array(arr1) => match other {
+                Value::Array(arr2) => {
+                    let mut arr = arr1.clone();
+                    arr.append(&mut arr2.clone());
+                    return Value::Array(arr);
+                },
+                _ => todo!()
+            },
             _ => todo!(),
         }
     }

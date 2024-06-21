@@ -1,10 +1,8 @@
-let arr = ["el1", "el2"];
+for (let i = 0; i < 100; i++) {
+    let arr = [];
 
-console.log(arr[9]);
-
-let obj = {
-    username: "DylanMashini",
-    password: "password",
+    for (let j = 0; j < 100; j++) {
+        arr = arr + [i, j];
+        console.log(arr);
+    }
 }
-
-console.log(obj.username);
