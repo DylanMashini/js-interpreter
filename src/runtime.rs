@@ -1,11 +1,16 @@
 use crate::ast::{
-    BinOp, BinaryExpr, BracketExpr, CallExpr, DotExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program, Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt
+    BinOp, BinaryExpr, BracketExpr, CallExpr, DotExpr, Expression, ForStmt, FuncDecleration,
+    IfStmt, Literal, Program, Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration,
+    WhileStmt,
 };
 
+use crate::array::get_array_prototype;
 use crate::console::log;
 use crate::math::get_math_module;
+use once_cell::sync::Lazy;
 
 use core::fmt;
+use std::sync::Arc;
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -13,10 +18,12 @@ use std::{
 };
 
 type RustFunc = fn(Vec<Value>) -> Value;
+type RustMutFunc = fn(&mut Value, Vec<Value>) -> Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionBody {
     RustFunc(RustFunc),
+    RustMutFunc(RustMutFunc),
     JSFunc(Statement),
 }
 
@@ -36,16 +43,38 @@ impl Function {
 }
 
 #[derive(Clone, PartialEq)]
+pub struct Prototype {
+    pub methods: HashMap<String, Value>,
+}
+
+impl Prototype {
+    pub fn new(methods: HashMap<String, Value>) -> Self {
+        Self { methods }
+    }
+}
+
+static ARRAY_PROTOTYPE: Lazy<Arc<Prototype>> = Lazy::new(|| Arc::new(get_array_prototype()));
+
+#[derive(Clone, PartialEq)]
 pub struct Object {
     pub fields: HashMap<String, Value>,
+    pub prototype: Option<Arc<Prototype>>,
 }
 
 impl Object {
     pub fn new(fields: HashMap<String, Value>) -> Object {
-        Object { fields }
+        Object {
+            fields,
+            prototype: None,
+        }
     }
     pub fn get_property(&self, id: String) -> &Value {
-        self.fields.get(&id).unwrap_or(&Value::Null)
+        self.fields.get(&id).unwrap_or_else(|| {
+            self.prototype
+                .as_ref()
+                .and_then(|proto| proto.methods.get(&id))
+                .unwrap_or(&Value::Null)
+        })
     }
 }
 
@@ -57,7 +86,7 @@ pub enum Value {
     Function(Function),
     Null,
     Object(Object),
-    Array(Vec<Value>),
+    Array(Vec<Value>, Arc<Prototype>),
 }
 
 impl fmt::Debug for Value {
@@ -72,7 +101,7 @@ impl fmt::Debug for Value {
                 Value::Function(_) => format!("Printing Functions Not Supported"),
                 Value::Null => "null".to_string(),
                 // TODO: Properly Format array output
-                Value::Array(arr) => format!("{:?}", arr),
+                Value::Array(arr, _) => format!("{:?}", arr),
                 Value::Object(obj) => format!("{:?}", obj.fields),
             }
         )
@@ -80,6 +109,13 @@ impl fmt::Debug for Value {
 }
 
 impl Value {
+    pub fn get_property(&self, id: &String) -> &Value {
+        match self {
+            Value::Object(obj) => obj.get_property(id.clone()),
+            Value::Array(_, proto) => &proto.methods.get(id).unwrap_or(&Value::Null),
+            _ => &Value::Null,
+        }
+    }
     pub fn add(&self, other: &Value) -> Value {
         match self {
             Value::Number(n) => match other {
@@ -108,13 +144,13 @@ impl Value {
             },
             Value::Function(_) => panic!("Can not add a function"),
             Value::Null => todo!("Im lazy"),
-            Value::Array(arr1) => match other {
-                Value::Array(arr2) => {
+            Value::Array(arr1, proto) => match other {
+                Value::Array(arr2, _) => {
                     let mut arr = arr1.clone();
                     arr.append(&mut arr2.clone());
-                    return Value::Array(arr);
-                },
-                _ => todo!()
+                    return Value::Array(arr, proto.clone());
+                }
+                _ => todo!(),
             },
             _ => todo!(),
         }
@@ -532,8 +568,8 @@ impl Runtime {
                 scoped_enviorment,
             ),
             Expression::DotExpr(dot_expr) => {
-                self.evaluate_dot_expression(dot_expr, scoped_enviorment) 
-            },
+                self.evaluate_dot_expression(dot_expr, scoped_enviorment)
+            }
             Expression::BracketExpression(bracket_expr) => {
                 self.evaluate_bracket_expression(bracket_expr, scoped_enviorment)
             }
@@ -561,16 +597,15 @@ impl Runtime {
                 }
 
                 return Value::Object(Object::new(obj_value));
-            },
+            }
             Literal::Array(exprs) => {
-                let mut arr: Vec<Value>= Vec::new();
+                let mut arr: Vec<Value> = Vec::new();
                 for expr in exprs {
                     arr.push(self.evaluate_expression(expr, scoped_enviorment.clone()));
-                };
+                }
 
-                Value::Array(arr)
-            },
-            _ => todo!(),
+                Value::Array(arr, ARRAY_PROTOTYPE.clone())
+            }
         }
     }
 
@@ -768,7 +803,7 @@ impl Runtime {
             .get_variable(&function_call.callee)
         {
             if function_call.arguments.len() != callee.arguments.len() {
-                panic!("Arguments don't match up");
+                panic!("arguments dont match up");
             }
 
             let mut arg_values: Vec<Value> = Vec::new();
@@ -803,6 +838,9 @@ impl Runtime {
                         .clone();
                 }
                 FunctionBody::RustFunc(func) => (func)(arg_values),
+                FunctionBody::RustMutFunc(_) => {
+                    panic!("RustMutFunc must be called on an object!!")
+                }
             };
         } else {
             self.error("Function Not Found")
@@ -812,26 +850,68 @@ impl Runtime {
     fn invoke_method(
         &self,
         function_call: &CallExpr,
-        object: &Object,
+        this_value: &mut Value,
         scoped_enviorment: Rc<RefCell<Enviorment>>,
     ) -> Value {
-        // Guard to make sure that Method actually exists on object
-        match object
-            .fields
-            .get(&function_call.callee)
-            .unwrap_or(&Value::Null)
-        {
-            Value::Function(_) => (),
-            _ => panic!("Method Not Callable on Object"),
+        let method = match &this_value {
+            Value::Object(obj) => obj.get_property(function_call.callee.clone()),
+            Value::Array(_, proto) => proto
+                .methods
+                .get(&function_call.callee)
+                .unwrap_or(&Value::Null),
+            _ => &Value::Null,
         };
 
-        let env = Rc::new(RefCell::new(Enviorment::new(Some(
-            Rc::<RefCell<Enviorment>>::downgrade(&scoped_enviorment),
-        ))));
+        match method {
+            Value::Function(callee) => {
+                if function_call.arguments.len() != callee.arguments.len() {
+                    if !(callee.arguments[0] == "self"
+                        && function_call.arguments.len() + 1 == callee.arguments.len())
+                    {
+                        println!("{:?}", callee.arguments[0]);
+                        panic!("Arguments don't match up");
+                    }
+                }
 
-        env.borrow_mut().variables = object.fields.clone();
+                let mut arg_values: Vec<Value> = Vec::new();
 
-        self.invoke_function(function_call, env)
+                arg_values.reserve(callee.arguments.len());
+
+                let scope = Rc::new(RefCell::new(Enviorment::new(Some(
+                    Rc::<RefCell<Enviorment>>::downgrade(&scoped_enviorment),
+                ))));
+                scope
+                    .borrow_mut()
+                    .create_variable("return-value".to_string(), None);
+
+                for arg_expression in function_call.arguments.iter() {
+                    let arg_value =
+                        self.evaluate_expression(arg_expression, scoped_enviorment.clone());
+                    arg_values.push(arg_value);
+                }
+
+                for (arg_value, arg_name) in arg_values.iter().zip(callee.arguments.iter()) {
+                    scope
+                        .borrow_mut()
+                        .create_variable(arg_name.clone(), Some(arg_value.clone()));
+                }
+
+                match &callee.body {
+                    FunctionBody::JSFunc(body) => {
+                        self.execute_statement(body, scope.clone());
+                        scope
+                            .borrow()
+                            .variables
+                            .get("return-value")
+                            .unwrap()
+                            .clone()
+                    }
+                    FunctionBody::RustFunc(func) => (func)(arg_values),
+                    FunctionBody::RustMutFunc(func) => (func)(this_value, arg_values),
+                }
+            }
+            _ => panic!("Method Not Callable"),
+        }
     }
 
     fn return_statement(
@@ -870,30 +950,48 @@ impl Runtime {
         }
     }
 
-    fn evaluate_bracket_expression(&self, bracket_expression: &BracketExpr, scoped_enviorment: Rc<RefCell<Enviorment>>) -> Value {
+    fn evaluate_bracket_expression(
+        &self,
+        bracket_expression: &BracketExpr,
+        scoped_enviorment: Rc<RefCell<Enviorment>>,
+    ) -> Value {
         // TODO: Support Literals on left hand of dot expr
-        let property = self.evaluate_expression(&bracket_expression.property, scoped_enviorment.clone());
+        let property =
+            self.evaluate_expression(&bracket_expression.property, scoped_enviorment.clone());
 
         match property {
-            Value::String(str) => self.evaluate_dot_expression(&DotExpr::new(bracket_expression.object.clone(), Box::new(Expression::Identifier(str))), scoped_enviorment),
+            Value::String(str) => self.evaluate_dot_expression(
+                &DotExpr::new(
+                    bracket_expression.object.clone(),
+                    Box::new(Expression::Identifier(str)),
+                ),
+                scoped_enviorment,
+            ),
             Value::Number(num) => {
                 if num.fract() != 0.0 || num > usize::MAX as f64 {
                     panic!("Index in bracket expression MUST be integer");
                 }
                 let i = num as usize;
                 // object must be String or array
-                let object = self.evaluate_expression(&bracket_expression.object, scoped_enviorment);
+                let object =
+                    self.evaluate_expression(&bracket_expression.object, scoped_enviorment);
 
                 match object {
                     // TODO: Return unndefined
-                    Value::String(str) => return Value::String(str.chars().nth(i).expect("Index must be in bounds of String").to_string()),
-                    Value::Array(arr) => return arr.get(i).unwrap_or(&Value::Null).clone(),
+                    Value::String(str) => {
+                        return Value::String(
+                            str.chars()
+                                .nth(i)
+                                .expect("Index must be in bounds of String")
+                                .to_string(),
+                        )
+                    }
+                    Value::Array(arr, _) => return arr.get(i).unwrap_or(&Value::Null).clone(),
                     _ => panic!("Can not index into type other than string or array"),
                 }
-            },
-            _ => panic!("Only Strings or Indexes are supported in bracket expression")
+            }
+            _ => panic!("Only Strings or Indexes are supported in bracket expression"),
         }
-
     }
 
     fn evaluate_dot_expression(
@@ -901,47 +999,29 @@ impl Runtime {
         dot_expression: &DotExpr,
         scoped_enviorment: Rc<RefCell<Enviorment>>,
     ) -> Value {
-        // TODO: Support Literals on left hand of dot expr
         let obj_id = match &*dot_expression.object {
             Expression::Identifier(id) => id,
             _ => panic!("LEFT HAND OF DOT EXPR MUST BE ID"),
         };
 
-        let object = match scoped_enviorment.borrow().get_variable(obj_id) {
-            Value::Object(obj) => obj,
-            _ => panic!("Can not use dot expression with non-object value"),
-        };
+        let mut object = scoped_enviorment.borrow().get_variable(obj_id);
 
-        match &*dot_expression.property {
-            Expression::Identifier(id) => object.get_property(id.clone()).clone(),
-            Expression::DotExpr(expr) => self.evaluate_accessor(expr, &object, scoped_enviorment),
-            Expression::CallExpr(expr) => self.invoke_method(expr, &object, scoped_enviorment),
-            _ => panic!("IDK THIS SHOULDN'T HAPPEN: {:?}", dot_expression.property),
+        let obj_pre_mutation = object.clone();
+
+        let res = match &*dot_expression.property {
+            Expression::Identifier(id) => object.get_property(id).clone(),
+            Expression::CallExpr(expr) => {
+                self.invoke_method(expr, &mut object, scoped_enviorment.clone())
+            }
+            _ => panic!("Invalid property in dot expression"),
+        };
+        if obj_pre_mutation != object {
+            scoped_enviorment
+                .borrow_mut()
+                .assign_variable(obj_id.clone(), object);
         }
-    }
 
-    fn evaluate_accessor(
-        &self,
-        dot_expression: &DotExpr,
-        object: &Object,
-        scoped_enviorment: Rc<RefCell<Enviorment>>,
-    ) -> Value {
-        let id = match &*dot_expression.object {
-            Expression::Identifier(id) => id,
-            _ => panic!("Left hand of Dot Expr must be ID"),
-        };
-
-        let val = match object.get_property(id.clone()) {
-            Value::Object(obj) => obj,
-            _ => panic!("left hand must eval to Object"),
-        };
-
-        match &*dot_expression.property {
-            Expression::DotExpr(expr) => self.evaluate_accessor(expr, val, scoped_enviorment),
-            Expression::Identifier(id) => return val.get_property(id.clone()).clone(),
-            Expression::CallExpr(expr) => return self.invoke_method(expr, val, scoped_enviorment),
-            _ => panic!("Dot Expression Right Side MUST be DotExpr or ID"),
-        }
+        res
     }
 
     fn finished(&mut self) -> bool {

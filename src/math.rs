@@ -33,7 +33,6 @@ pub fn tan(args: Vec<Value>) -> Value {
     }
 }
 
-
 pub fn get_math_module() -> Value {
     let mut math = Object::new(HashMap::new());
 
@@ -63,7 +62,6 @@ pub fn get_math_module() -> Value {
     math.fields.insert("sin".to_string(), tan);
     math.fields
         .insert("PI".to_string(), Value::Number(std::f64::consts::PI));
-
 
     Value::Object(math)
 }

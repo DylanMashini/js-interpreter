@@ -1,4 +1,4 @@
-#![allow(unused_imports)]
+#![allow(unused_imports, dead_code)]
 #![feature(test)]
 extern crate test;
 
@@ -15,6 +15,7 @@ mod runtime;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use crate::runtime::Runtime;
+mod array;
 mod ast;
 mod console;
 mod math;

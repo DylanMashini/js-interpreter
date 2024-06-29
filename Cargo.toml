@@ -15,4 +15,5 @@ debug = true
 
 
 [dependencies]
+once_cell = "1.19.0"
 wasm-bindgen = "0.2"

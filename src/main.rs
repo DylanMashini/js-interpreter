@@ -7,6 +7,7 @@ use parser::Parser;
 mod runtime;
 use runtime::Runtime;
 use std::env;
+mod array;
 mod console;
 mod math;
 

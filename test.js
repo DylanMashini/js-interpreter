@@ -1,8 +1,5 @@
-for (let i = 0; i < 100; i++) {
-    let arr = [];
+let arr = ["Test1"];
 
-    for (let j = 0; j < 100; j++) {
-        arr = arr + [i, j];
-        console.log(arr);
-    }
-}
+arr.push("test2");
+
+console.log(arr);
