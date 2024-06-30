@@ -7,6 +7,7 @@ use crate::ast::{
 use crate::array::get_array_prototype;
 use crate::console::log;
 use crate::math::get_math_module;
+use crate::string::get_string_prototype;
 use once_cell::sync::Lazy;
 
 use core::fmt;
@@ -54,6 +55,7 @@ impl Prototype {
 }
 
 static ARRAY_PROTOTYPE: Lazy<Arc<Prototype>> = Lazy::new(|| Arc::new(get_array_prototype()));
+static STRING_PROTOTYPE: Lazy<Arc<Prototype>> = Lazy::new(|| Arc::new(get_string_prototype()));
 
 #[derive(Clone, PartialEq)]
 pub struct Object {
@@ -81,7 +83,7 @@ impl Object {
 #[derive(Clone, PartialEq)]
 pub enum Value {
     Number(f64),
-    String(String),
+    String(String, Arc<Prototype>),
     Boolean(bool),
     Function(Function),
     Null,
@@ -96,7 +98,7 @@ impl fmt::Debug for Value {
             "{}",
             match self {
                 Value::Number(val) => val.to_string(),
-                Value::String(val) => val.to_string(),
+                Value::String(val, _) => val.to_string(),
                 Value::Boolean(val) => val.to_string(),
                 Value::Function(_) => format!("Printing Functions Not Supported"),
                 Value::Null => "null".to_string(),
@@ -120,23 +122,41 @@ impl Value {
         match self {
             Value::Number(n) => match other {
                 Value::Number(n2) => return Value::Number(n + n2),
-                Value::String(val) => return Value::String(n.to_string() + val),
+                Value::String(val, _) => {
+                    return Value::String(n.to_string() + val, STRING_PROTOTYPE.clone())
+                }
                 Value::Boolean(b) => return Value::Number(n + (*b as i8) as f64),
                 Value::Null => return Value::Number(*n),
                 Value::Function(_) => panic!("Can not add a function"),
                 _ => todo!(),
             },
-            Value::String(str1) => match other {
-                Value::Number(n2) => return Value::String(str1.to_owned() + &n2.to_string()),
-                Value::String(str2) => return Value::String(str1.to_owned() + str2),
-                Value::Boolean(b2) => return Value::String(str1.to_owned() + &b2.to_string()),
-                Value::Null => return Value::String(str1.to_owned() + "null"),
+            Value::String(str1, _) => match other {
+                Value::Number(n2) => {
+                    return Value::String(
+                        str1.to_owned() + &n2.to_string(),
+                        STRING_PROTOTYPE.clone(),
+                    )
+                }
+                Value::String(str2, _) => {
+                    return Value::String(str1.to_owned() + str2, STRING_PROTOTYPE.clone())
+                }
+                Value::Boolean(b2) => {
+                    return Value::String(
+                        str1.to_owned() + &b2.to_string(),
+                        STRING_PROTOTYPE.clone(),
+                    )
+                }
+                Value::Null => {
+                    return Value::String(str1.to_owned() + "null", STRING_PROTOTYPE.clone())
+                }
                 Value::Function(_) => panic!("Can not add a function"),
                 _ => todo!(),
             },
             Value::Boolean(b1) => match other {
                 Value::Number(n2) => return Value::Number((*b1 as i8) as f64 + n2),
-                Value::String(s2) => return Value::String(b1.to_string() + s2),
+                Value::String(s2, _) => {
+                    return Value::String(b1.to_string() + s2, STRING_PROTOTYPE.clone())
+                }
                 Value::Boolean(b2) => return Value::Number(((*b1 as i8) + (*b2 as i8)) as f64),
                 Value::Null => return Value::Boolean(*b1),
                 Value::Function(_) => panic!("Can not add a function"),
@@ -259,7 +279,7 @@ impl Value {
 
     pub fn less_than(&self, other: &Value) -> bool {
         match (self, other) {
-            (Value::String(s1), Value::String(s2)) => s1 < s2,
+            (Value::String(s1, _), Value::String(s2, _)) => s1 < s2,
             (Value::Number(_), _) | (Value::Boolean(_), _) | (Value::Null, _) => {
                 self.to_f64() < other.to_f64()
             }
@@ -269,7 +289,7 @@ impl Value {
 
     pub fn greater_than(&self, other: &Value) -> bool {
         match (self, other) {
-            (Value::String(s1), Value::String(s2)) => s1 > s2,
+            (Value::String(s1, _), Value::String(s2, _)) => s1 > s2,
             (Value::Number(_), _) | (Value::Boolean(_), _) | (Value::Null, _) => {
                 self.to_f64() > other.to_f64()
             }
@@ -279,7 +299,7 @@ impl Value {
 
     pub fn less_than_or_equal_to(&self, other: &Value) -> bool {
         match (self, other) {
-            (Value::String(s1), Value::String(s2)) => s1 <= s2,
+            (Value::String(s1, _), Value::String(s2, _)) => s1 <= s2,
             (Value::Number(_), _) | (Value::Boolean(_), _) | (Value::Null, _) => {
                 self.to_f64() <= other.to_f64()
             }
@@ -289,7 +309,7 @@ impl Value {
 
     pub fn greater_than_or_equal_to(&self, other: &Value) -> bool {
         match (self, other) {
-            (Value::String(s1), Value::String(s2)) => s1 >= s2,
+            (Value::String(s1, _), Value::String(s2, _)) => s1 >= s2,
             (Value::Number(_), _) | (Value::Boolean(_), _) | (Value::Null, _) => {
                 self.to_f64() >= other.to_f64()
             }
@@ -300,7 +320,7 @@ impl Value {
     pub fn equals(&self, other: &Value) -> bool {
         match (self, other) {
             (Value::Number(n1), Value::Number(n2)) => n1 == n2,
-            (Value::String(s1), Value::String(s2)) => s1 == s2,
+            (Value::String(s1, _), Value::String(s2, _)) => s1 == s2,
             (Value::Boolean(b1), Value::Boolean(b2)) => b1 == b2,
             (Value::Null, Value::Null) => true,
             (Value::Function(_), Value::Function(_)) => panic!("Cannot compare functions with =="),
@@ -317,13 +337,14 @@ impl Value {
             // Special cases for string conversions not handled, as JavaScript would convert
             // numbers and booleans to strings, or parse strings to numbers if possible.
             // Implementing these would need explicit parsing and conversion code.
-            (Value::String(s), Value::Number(n)) | (Value::Number(n), Value::String(s)) => {
+            (Value::String(s, _), Value::Number(n)) | (Value::Number(n), Value::String(s, _)) => {
                 s.parse::<f64>().ok().map_or(false, |num| &num == n)
             }
-            (Value::String(s), Value::Boolean(b)) | (Value::Boolean(b), Value::String(s)) => s
-                .parse::<f64>()
-                .ok()
-                .map_or(false, |num| num == (*b as i8 as f64)),
+            (Value::String(s, _), Value::Boolean(b)) | (Value::Boolean(b), Value::String(s, _)) => {
+                s.parse::<f64>()
+                    .ok()
+                    .map_or(false, |num| num == (*b as i8 as f64))
+            }
             _ => false, // All other combinations are considered not equal
         }
     }
@@ -335,7 +356,7 @@ impl Value {
     fn is_truthy(&self) -> bool {
         match self {
             Value::Number(n) => *n != 0.0 && !n.is_nan(),
-            Value::String(s) => !s.is_empty(),
+            Value::String(s, _) => !s.is_empty(),
             Value::Boolean(b) => *b,
             Value::Null => false,
             Value::Function(_) => true, // Functions are always truthy
@@ -586,7 +607,7 @@ impl Runtime {
         match expression {
             Literal::Boolean(b) => return Value::Boolean(*b),
             Literal::Number(n) => return Value::Number(*n),
-            Literal::String(s) => return Value::String(s.clone()),
+            Literal::String(s) => return Value::String(s.clone(), STRING_PROTOTYPE.clone()),
             Literal::Null => return Value::Null,
             Literal::Json(obj) => {
                 let mut obj_value: HashMap<String, Value> = HashMap::new();
@@ -859,6 +880,10 @@ impl Runtime {
                 .methods
                 .get(&function_call.callee)
                 .unwrap_or(&Value::Null),
+            Value::String(_, proto) => proto
+                .methods
+                .get(&function_call.callee)
+                .unwrap_or(&Value::Null),
             _ => &Value::Null,
         };
 
@@ -960,7 +985,7 @@ impl Runtime {
             self.evaluate_expression(&bracket_expression.property, scoped_enviorment.clone());
 
         match property {
-            Value::String(str) => self.evaluate_dot_expression(
+            Value::String(str, _) => self.evaluate_dot_expression(
                 &DotExpr::new(
                     bracket_expression.object.clone(),
                     Box::new(Expression::Identifier(str)),
@@ -978,12 +1003,13 @@ impl Runtime {
 
                 match object {
                     // TODO: Return unndefined
-                    Value::String(str) => {
+                    Value::String(str, _) => {
                         return Value::String(
                             str.chars()
                                 .nth(i)
                                 .expect("Index must be in bounds of String")
                                 .to_string(),
+                            STRING_PROTOTYPE.clone(),
                         )
                     }
                     Value::Array(arr, _) => return arr.get(i).unwrap_or(&Value::Null).clone(),

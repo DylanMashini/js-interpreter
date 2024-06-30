@@ -10,6 +10,7 @@ use std::env;
 mod array;
 mod console;
 mod math;
+mod string;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

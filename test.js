@@ -1,5 +1,3 @@
-let arr = ["Test1"];
+let str = "Testing";
 
-arr.push("test2");
-
-console.log(arr);
+console.log(str.includes("Test", 1));

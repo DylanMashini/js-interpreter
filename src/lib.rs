@@ -11,6 +11,7 @@ use wasm_bindgen::prelude::*;
 mod lexer;
 mod parser;
 mod runtime;
+mod string;
 
 use crate::lexer::Lexer;
 use crate::parser::Parser;
@@ -64,6 +65,22 @@ mod tests {
     #[bench]
     fn bench_fib_series(b: &mut Bencher) {
         let code = include_str!("../benchmarks/fibonacci.js").to_string();
+        b.iter(|| {
+            run_js(&code);
+        })
+    }
+
+    #[bench]
+    fn bench_arr_push(b: &mut Bencher) {
+        let code = include_str!("../benchmarks/arrPush.js").to_string();
+        b.iter(|| {
+            run_js(&code);
+        })
+    }
+
+    #[bench]
+    fn bench_arr_add(b: &mut Bencher) {
+        let code = include_str!("../benchmarks/arrAdd.js").to_string();
         b.iter(|| {
             run_js(&code);
         })
