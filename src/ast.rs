@@ -21,6 +21,7 @@ pub enum Expression {
     Decrement(String),
     DotExpr(DotExpr),
     BracketExpression(BracketExpr),
+    ArrowFunction(ArrowFunctionExpr),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -109,6 +110,18 @@ pub struct BracketExpr {
 impl BracketExpr {
     pub fn new(object: Box<Expression>, property: Box<Expression>) -> BracketExpr {
         BracketExpr { object, property }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArrowFunctionExpr {
+    pub parameters: Vec<String>,
+    pub body: Box<StatementValue>,
+}
+
+impl ArrowFunctionExpr {
+    pub fn new(parameters: Vec<String>, body: Box<StatementValue>) -> ArrowFunctionExpr {
+        ArrowFunctionExpr { parameters, body }
     }
 }
 

@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::ast::{
-    BinOp, BinaryExpr, BracketExpr, CallExpr, DotExpr, Expression, ForStmt, FuncDecleration, IfStmt, Literal, Program, Statement, StatementValue, UnOp, UnaryExpr, VariableDecleration, WhileStmt
+    ArrowFunctionExpr, BinOp, BinaryExpr, BracketExpr, CallExpr, DotExpr, Expression, ForStmt,
+    FuncDecleration, IfStmt, Literal, Program, Statement, StatementValue, UnOp, UnaryExpr,
+    VariableDecleration, WhileStmt,
 };
 
 use crate::lexer::{Token, TokenValue};
@@ -296,10 +298,10 @@ impl Parser {
     }
 
     fn assignment(&mut self) -> Expression {
-        let mut expr = self.plus_equal();
+        let mut expr = self.arrow_function();
 
         if let Some(_) = self.match_token_consume(TokenValue::Equal) {
-            let right_side = self.logical_or();
+            let right_side = self.arrow_function();
 
             expr = Expression::BinaryExpr(BinaryExpr::new(
                 Box::new(expr),
@@ -310,6 +312,51 @@ impl Parser {
 
         expr
     }
+
+    fn arrow_function(&mut self) -> Expression {
+        let start_position = self.position;
+        let mut params: Vec<String> = Vec::new();
+
+        if self.match_token_consume(TokenValue::LParentheses).is_some() {
+            if self.peek().value != TokenValue::RParentheses {
+                loop {
+                    if let TokenValue::Identifier(name) = self
+                        .consume_identifier("Expected param name in arrow function decleration")
+                        .value
+                    {
+                        params.push(name);
+                        if self.match_token_consume(TokenValue::Comma).is_none()
+                            && self.peek().value == TokenValue::RParentheses
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            self.consume(
+                TokenValue::RParentheses,
+                "Expected Closing Parentheses in Arrow Function Decleration",
+            );
+        } else if let TokenValue::Identifier(name) = self.peek().value.clone() {
+            self.advance();
+            params.push(name);
+        }
+
+        if self.match_token_consume(TokenValue::Arrow).is_some() {
+            let body = if self.peek().value == TokenValue::LCurlyBracket {
+                Box::new(self.block_statement())
+            } else {
+                Box::new(StatementValue::ReturnStatement(self.expression()))
+            };
+
+            Expression::ArrowFunction(ArrowFunctionExpr::new(params, body))
+        } else {
+            self.position = start_position;
+            self.plus_equal()
+        }
+    }
+
     // Also handles minus_equal
     fn plus_equal(&mut self) -> Expression {
         let mut expr = self.logical_or();
@@ -552,17 +599,30 @@ impl Parser {
         if self.match_token_consume(TokenValue::LBracket).is_some() {
             // expr can be identifier, array, or object
             match expr {
-                Expression::Identifier(id) => expr = Expression::BracketExpression(BracketExpr::new(Box::new(Expression::Identifier(id)), Box::new(self.expression()))),
+                Expression::Identifier(id) => {
+                    expr = Expression::BracketExpression(BracketExpr::new(
+                        Box::new(Expression::Identifier(id)),
+                        Box::new(self.expression()),
+                    ))
+                }
                 Expression::LiteralExpr(literal_expr) => {
-                    if matches!(literal_expr, Literal::Array(_)) || matches!(literal_expr, Literal::Json(_)) {
-                        expr = Expression::BracketExpression(BracketExpr::new(Box::new(Expression::LiteralExpr(literal_expr)), Box::new(self.expression())));
+                    if matches!(literal_expr, Literal::Array(_))
+                        || matches!(literal_expr, Literal::Json(_))
+                    {
+                        expr = Expression::BracketExpression(BracketExpr::new(
+                            Box::new(Expression::LiteralExpr(literal_expr)),
+                            Box::new(self.expression()),
+                        ));
                     } else {
                         panic!("Bracket Expression Invalid")
                     };
                 }
-                _ => panic!("Bracket Expression Invalid")
+                _ => panic!("Bracket Expression Invalid"),
             }
-            self.consume(TokenValue::RBracket, "Bracket Expression must end with RBracket");
+            self.consume(
+                TokenValue::RBracket,
+                "Bracket Expression must end with RBracket",
+            );
         }
 
         expr
@@ -639,7 +699,6 @@ impl Parser {
                     {
                         break;
                     }
-
                 }
             }
         }

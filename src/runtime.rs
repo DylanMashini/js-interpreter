@@ -20,11 +20,13 @@ use std::{
 
 type RustFunc = fn(Vec<Value>) -> Value;
 type RustMutFunc = fn(&mut Value, Vec<Value>) -> Value;
+type RustMutFuncWithRuntime = fn(&mut Value, &Runtime, Vec<Value>) -> Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionBody {
     RustFunc(RustFunc),
     RustMutFunc(RustMutFunc),
+    RustMutFuncWithRuntime(RustMutFuncWithRuntime),
     JSFunc(Statement),
 }
 
@@ -594,6 +596,10 @@ impl Runtime {
             Expression::BracketExpression(bracket_expr) => {
                 self.evaluate_bracket_expression(bracket_expr, scoped_enviorment)
             }
+            Expression::ArrowFunction(arrow_expr) => Value::Function(Function::new(
+                arrow_expr.parameters.clone(),
+                Statement::new(*arrow_expr.body.clone(), self.line.borrow().clone()),
+            )),
         };
 
         val

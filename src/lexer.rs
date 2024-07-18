@@ -47,6 +47,7 @@ pub enum TokenValue {
     Colon,
     Not,
     Equal,
+    Arrow,
     DoubleEqual,
     NotEqual,
     TripleEqual,
@@ -197,7 +198,7 @@ impl Lexer {
                             }
                         }
                         State::InOperator => match c {
-                            '=' | '+' | '-' | '|' | '&' => {
+                            '=' | '+' | '-' | '|' | '&' | '>' => {
                                 current_token.push(c);
                             }
                             _ => {
@@ -221,6 +222,7 @@ impl Lexer {
                                         "/" => tokens.push(Token::new(TokenValue::Divide, line_num + 1)),
                                         "||" => tokens.push(Token::new(TokenValue::Or, line_num + 1)),
                                         "&&" => tokens.push(Token::new(TokenValue::And, line_num + 1)),
+                                        "=>" => tokens.push(Token::new(TokenValue::Arrow, line_num + 1)),
                                         val => panic!("Tokenization Error on line: {}\nUnknown operator token: {}", line_num + 1, val)
 
                                     }
