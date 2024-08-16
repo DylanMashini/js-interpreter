@@ -320,16 +320,16 @@ impl Parser {
         if self.match_token_consume(TokenValue::LParentheses).is_some() {
             if self.peek().value != TokenValue::RParentheses {
                 loop {
-                    if let TokenValue::Identifier(name) = self
-                        .consume_identifier("Expected param name in arrow function decleration")
-                        .value
-                    {
+                    if let TokenValue::Identifier(name) = self.advance().value {
                         params.push(name);
                         if self.match_token_consume(TokenValue::Comma).is_none()
                             && self.peek().value == TokenValue::RParentheses
                         {
                             break;
                         }
+                    } else {
+                        self.position = start_position;
+                        return self.plus_equal();
                     }
                 }
             }
