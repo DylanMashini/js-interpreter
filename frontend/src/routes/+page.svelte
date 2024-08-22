@@ -1,29 +1,43 @@
 <script lang="ts">
-    import init, {run_js} from "$lib/interpreter"
-    import {onMount} from "svelte"
-    
-    let code = "";
-    let output = "";
+  import Button from './Button.svelte';
+  import ScrollArea from './ScrollArea.svelte';
+  import init, {run_js} from "$lib/interpreter";
+  import {onMount} from "svelte";
 
-    let ready = false;
 
-    onMount(async () => {
+  let interpreter_running = false;
+
+  onMount(async () => {
         await init()
-        ready = true;
-    })
+        interpreter_running = true;
+    });
 
-    const run_code = async () => {
-        if (ready) {
-            output = run_js(code);
-            console.log(output)
-        }
-    }
+  let code = '// Write your JavaScript code here\nconsole.log("Hello, World!");';
+  let output = '';
+
+  function runCode() {
+    output = run_js(code);
+  }
 </script>
 
-<textarea class="w-full min-h-12" bind:value={code}></textarea>
-
-<button on:click={run_code}>Run</button>
-
-<div>
-{@html output.replace("\n", "<br>")}
+<div class="flex flex-col h-screen bg-gray-900 text-gray-100 p-4">
+  <h1 class="text-2xl font-bold mb-4">JavaScript Playground</h1>
+  <div class="flex flex-col flex-grow">
+    <div class="flex-grow mb-4">
+      <textarea
+        bind:value={code}
+        class="w-full h-full p-4 bg-gray-800 text-gray-100 font-mono text-sm rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+        spellcheck="false"
+      ></textarea>
+    </div>
+    <Button on:click={runCode} className="mb-4">
+      Run Code
+    </Button>
+    <div class="flex-grow">
+      <h2 class="text-lg font-semibold mb-2">Output:</h2>
+      <ScrollArea className="h-[200px] w-full rounded-md border border-gray-700 bg-gray-800 p-4">
+        <pre class="font-mono text-sm whitespace-pre-wrap">{output}</pre>
+      </ScrollArea>
+    </div>
+  </div>
 </div>
