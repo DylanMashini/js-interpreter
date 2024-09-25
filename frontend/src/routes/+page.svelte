@@ -22,6 +22,7 @@
 
 <div class="flex flex-col h-screen bg-gray-900 text-gray-100 p-4">
   <h1 class="text-2xl font-bold mb-4">JavaScript Playground</h1>
+  <p>This is a interactive playground for the JS interpreter I wrote. When you execute code, it isn't run in the browsers runtime, insetad it runs in a runtime I wrote in Rust and compiled to WASM. The source code is availible <a href="https://github.com/DylanMashini/js-interpreter" target="_blank" rel="noreferer noopener" class="text-blue-400 underline">on GitHub</a></p>
   <div class="flex flex-col flex-grow">
     <div class="flex-grow mb-4">
       <textarea

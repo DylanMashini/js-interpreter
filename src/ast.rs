@@ -154,11 +154,12 @@ pub struct VariableDecleration {
     pub id: String,
     // Boxed to prevent recursive types
     pub init: Option<Box<Expression>>,
+    pub constant: bool,
 }
 
 impl VariableDecleration {
-    pub fn new(id: String, init: Option<Box<Expression>>) -> Self {
-        Self { id, init }
+    pub fn new(id: String, init: Option<Box<Expression>>, constant: bool) -> Self {
+        Self { id, init, constant }
     }
 }
 

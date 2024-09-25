@@ -22,6 +22,7 @@ pub enum TokenValue {
     If,
     Else,
     Let,
+    Const,
     While,
     For,
     Function,
@@ -127,7 +128,7 @@ impl Lexer {
                             ',' => tokens.push(Token::new(TokenValue::Comma, line_num + 1)),
                             ';' => tokens.push(Token::new(TokenValue::Semicolon, line_num + 1)),
                             ':' => tokens.push(Token::new(TokenValue::Colon, line_num + 1)),
-                            '>' | '<' | '=' | '!' | '+' | '-' | '*' | '/' | '|' | '&' => {
+                            '>' | '<' | '=' | '!' | '+' | '-' | '*' | '/' | '|' | '&' | '/' => {
                                 current_token.push(c);
                                 self.state = State::InOperator
                             }
@@ -154,6 +155,9 @@ impl Lexer {
                                         tokens.push(Token::new(TokenValue::Else, line_num + 1))
                                     }
                                     "let" => tokens.push(Token::new(TokenValue::Let, line_num + 1)),
+                                    "const" => {
+                                        tokens.push(Token::new(TokenValue::Const, line_num + 1))
+                                    }
                                     "var" => tokens.push(Token::new(TokenValue::Let, line_num + 1)),
                                     "null" => {
                                         tokens.push(Token::new(TokenValue::Null, line_num + 1))
@@ -198,7 +202,7 @@ impl Lexer {
                             }
                         }
                         State::InOperator => match c {
-                            '=' | '+' | '-' | '|' | '&' | '>' => {
+                            '=' | '+' | '-' | '|' | '&' | '>' | '/' => {
                                 current_token.push(c);
                             }
                             _ => {
@@ -223,6 +227,11 @@ impl Lexer {
                                         "||" => tokens.push(Token::new(TokenValue::Or, line_num + 1)),
                                         "&&" => tokens.push(Token::new(TokenValue::And, line_num + 1)),
                                         "=>" => tokens.push(Token::new(TokenValue::Arrow, line_num + 1)),
+                                        "//" => {
+                                            self.state = State::Normal;
+                                            tokens.push(Token::new(TokenValue::EOL, line_num + 1));
+                                            break;
+                                        }
                                         val => panic!("Tokenization Error on line: {}\nUnknown operator token: {}", line_num + 1, val)
 
                                     }

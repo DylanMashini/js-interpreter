@@ -420,13 +420,13 @@ impl Value {
 }
 
 struct Enviorment {
-    variables: HashMap<String, Value>,
+    variables: HashMap<String, (Value, bool)>,
     parent: Option<Weak<RefCell<Enviorment>>>,
 }
 
 impl Enviorment {
     pub fn new(parent: Option<Weak<RefCell<Enviorment>>>) -> Enviorment {
-        let mut variables: HashMap<String, Value> = HashMap::new();
+        let mut variables: HashMap<String, (Value, bool)> = HashMap::new();
 
         if parent.is_none() {
             let mut console = Object::new(HashMap::new());
@@ -439,23 +439,23 @@ impl Enviorment {
                 }),
             );
 
-            variables.insert("console".to_string(), Value::Object(console));
-            variables.insert("Math".to_string(), get_math_module());
+            variables.insert("console".to_string(), (Value::Object(console), false));
+            variables.insert("Math".to_string(), (get_math_module(), false));
         }
 
         Enviorment { variables, parent }
     }
 
-    pub fn assign_variable(&mut self, id: String, value: Value) {
+    pub fn assign_variable(&mut self, id: String, value: Value, constant: bool) {
         match self.variables.get_mut(&id) {
-            Some(val) => *val = value,
+            Some(val) => *val = (value, false),
             None => {
                 match &mut self.parent {
                     Some(parent) => {
                         let env_rc = parent
                             .upgrade()
                             .expect("Parent should always drop after child");
-                        env_rc.borrow_mut().assign_variable(id, value);
+                        env_rc.borrow_mut().assign_variable(id, value, constant);
                         // parent.upgrade().expect("Parent should always exist if child does").get_mut().assign_variable(id, value);
                     }
                     None => panic!("Assigning Variable Failed, Variable not Found"),
@@ -465,12 +465,13 @@ impl Enviorment {
     }
 
     pub fn create_variable(&mut self, id: String, init: Option<Value>) {
-        self.variables.insert(id, init.unwrap_or(Value::Null));
+        self.variables
+            .insert(id, (init.unwrap_or(Value::Null), false));
     }
 
     pub fn get_variable(&self, id: &String) -> Value {
         match self.variables.get(id) {
-            Some(val) => val.clone(),
+            Some(val) => val.clone().0,
             None => match &self.parent {
                 Some(parent) => {
                     let env = parent
@@ -713,7 +714,7 @@ impl Runtime {
 
                 scoped_enviorment
                     .borrow_mut()
-                    .assign_variable(id.clone(), right.clone());
+                    .assign_variable(id.clone(), right.clone(), false);
 
                 right
             }
@@ -796,6 +797,7 @@ impl Runtime {
                     .get("return-value")
                     .expect("Already Checked")
                     .clone()
+                    .0
                     != Value::Null
             {
                 break;
@@ -860,7 +862,8 @@ impl Runtime {
                         .variables
                         .get("return-value")
                         .expect("Should Always exist")
-                        .clone();
+                        .clone()
+                        .0;
                 }
                 FunctionBody::RustFunc(func) => (func)(arg_values),
                 FunctionBody::RustMutFunc(_) => {
@@ -934,6 +937,7 @@ impl Runtime {
                             .get("return-value")
                             .unwrap()
                             .clone()
+                            .0
                     }
                     FunctionBody::RustFunc(func) => (func)(arg_values),
                     FunctionBody::RustMutFunc(func) => (func)(this_value, arg_values),
@@ -950,9 +954,11 @@ impl Runtime {
     ) {
         let evaluated_expr =
             self.evaluate_expression(&return_expression, scoped_enviorment.clone());
-        scoped_enviorment
-            .borrow_mut()
-            .assign_variable("return-value".to_string(), evaluated_expr)
+        scoped_enviorment.borrow_mut().assign_variable(
+            "return-value".to_string(),
+            evaluated_expr,
+            false,
+        )
     }
 
     fn while_statement(
@@ -1048,7 +1054,7 @@ impl Runtime {
         if obj_pre_mutation != object {
             scoped_enviorment
                 .borrow_mut()
-                .assign_variable(obj_id.clone(), object);
+                .assign_variable(obj_id.clone(), object, false);
         }
 
         res

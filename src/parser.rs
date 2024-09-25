@@ -37,7 +37,7 @@ impl Parser {
         let value = match self.peek().value {
             TokenValue::If => Some(self.if_statement()),
             TokenValue::LCurlyBracket => Some(self.block_statement()),
-            TokenValue::Let => Some(self.variable_declaration()),
+            TokenValue::Let | TokenValue::Const => Some(self.variable_declaration()),
             TokenValue::While => Some(self.while_loop_statement()),
             TokenValue::For => Some(self.for_loop_statement()),
             TokenValue::Function => Some(self.function_decleration()),
@@ -107,7 +107,14 @@ impl Parser {
     }
 
     pub fn variable_declaration(&mut self) -> StatementValue {
-        self.consume(TokenValue::Let, "expected 'let'");
+        let constant: bool;
+        if self.match_token_consume(TokenValue::Let).is_some() {
+            constant = false;
+        } else if self.match_token_consume(TokenValue::Const).is_some() {
+            constant = true;
+        } else {
+            panic!("Expected Let or Const")
+        }
         if let TokenValue::Identifier(name) = self.consume_identifier("Expect variable name.").value
         {
             let init = if self.match_token_consume(TokenValue::Equal).is_some() {
@@ -120,7 +127,7 @@ impl Parser {
             {
                 // Handle both a semicolon and newline
                 self.match_token_consume(TokenValue::EOL);
-                StatementValue::VariableStmt(VariableDecleration::new(name, init))
+                StatementValue::VariableStmt(VariableDecleration::new(name, init, constant))
             } else {
                 panic!("Parse Error at position {}\n Expected newline or semicolon after variable decleration. ", self.position);
             }

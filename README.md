@@ -1,6 +1,6 @@
 # JS Interpreter
 
-A  simple (sorta) JS interpreter written in Rust as a fun project to learn how to write an interpreter. Many things don't behave the same way they do in real runtimes like V8, but the syntax mirrors JS pretty closely. 
+A  simple JS interpreter written in Rust. Right now, some things don't behave the same way they do in ECMA-compliant runtimes like V8, but most JS syntax is supported. This is still unstable, and not suitable for usage in production, but there are applications for embedded computing in the future. 
 
 ## Project Structure
 - ``interpreter/``

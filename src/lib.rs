@@ -85,4 +85,9 @@ mod tests {
             run_js(&code);
         })
     }
+    #[test]
+    fn comments_test() {
+        let code = "//Test Comment\nconsole.log(\"Hello World\")".to_string();
+        run_js(&code);
+    }
 }
