@@ -21,7 +21,7 @@ jobs:
       with:
         version: 8
     - name: Build Demo
-      run: cd frontend && pnpm run install && pnpm run build
+      run: cd frontend && pnpm install && pnpm run build
     - name: Deploy using Terraform
       env: 
         TF_VAR_AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
