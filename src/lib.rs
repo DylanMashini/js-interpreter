@@ -23,9 +23,28 @@ mod math;
 
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 #[wasm_bindgen]
-pub fn run_js(source_code: String) -> String {
-    console::reset_output();
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+#[wasm_bindgen(inline_js = "export function error(x) { window.interpreterError = x }")]
+extern "C" {
+    fn error(x: String);
+}
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+#[wasm_bindgen]
+pub fn run_js(source_code: String) -> String {
+    std::panic::set_hook(Box::new(|info: &std::panic::PanicHookInfo| {
+        if let Some(err) = info.payload().downcast_ref::<String>() {
+            error(err.to_string());
+        } else if let Some(err) = info.payload().downcast_ref::<&str>() {
+            error(err.to_string());
+        }
+    }));
+    console::reset_output();
     let mut lexer = Lexer::new(source_code);
     let tokens = lexer.tokenize();
 
@@ -33,7 +52,6 @@ pub fn run_js(source_code: String) -> String {
 
     let mut runtime = Runtime::new(ast);
     runtime.run();
-
     return console::get_output();
 }
 
