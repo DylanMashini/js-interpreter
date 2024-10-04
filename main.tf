@@ -48,6 +48,7 @@ locals {
    "html" = "text/html"
    "css"  = "text/css"
    "ico" = "image/x-icon"
+   "wasm" = "application/wasm"
   }
 }
 

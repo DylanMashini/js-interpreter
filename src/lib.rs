@@ -29,7 +29,9 @@ extern "C" {
 }
 
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-#[wasm_bindgen(inline_js = "export function error(x) { window.interpreterError = x }")]
+#[wasm_bindgen(
+    inline_js = "export function error(x) { if (typeof window !== 'undefined') {window.interpreterError = x} else {self.interpreterError = x}}"
+)]
 extern "C" {
     fn error(x: String);
 }
