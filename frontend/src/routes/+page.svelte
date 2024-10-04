@@ -4,15 +4,16 @@
   import init, {run_js} from "$lib/interpreter";
   import {onMount} from "svelte";
   import { tick } from 'svelte';
-
+  import MyWorker from "$lib/worker?worker"
+  import type RunResult from "$lib/worker"
 
 
   let interpreter_running = false;
+  let worker;
 
-  onMount(async () => {
-        await init()
-        interpreter_running = true;
-    });
+  onMount(() => {
+      spawnWorker();
+  });
 
   let code = typeof window !== "undefined" && window.localStorage.getItem("interpreterCode") || '// Write your JavaScript code here\nconsole.log("Hello, World!");';
   let output = '';
@@ -21,14 +22,31 @@
   async function runCode() {
     error = "";
     window.localStorage.removeItem("interpreterError");
+    worker.postMessage(code);
+    return
     try {
-    output = run_js(code);
+        output = run_js(code);
     } catch (e) {
         error = window.interpreterError;
         window.localStorage.setItem("interpreterError", error);
         location.reload();
     }
   }
+
+  function spawnWorker() {
+    worker = new MyWorker();
+      worker.onmessage = onCompletedRun;
+      }
+
+  function onCompletedRun({data: result} : {data: RunResult}) {
+        if (result.result == "success") {
+            output = result.output;
+        } else {
+            error = result.output;
+            spawnWorker();
+        }
+    }
+
 
   $: typeof window !== "undefined" && window.localStorage.setItem("interpreterCode", code)
     async function handleKeyDown(event) {
