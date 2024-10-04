@@ -78,6 +78,7 @@
         on:keydown={handleKeyDown}
         class="w-full h-full p-4 bg-gray-800 text-gray-100 font-mono text-sm rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
         spellcheck="false"
+        data-gramm="false"
       ></textarea>
     </div>
     <Button on:click={runCode} className="mb-4">
