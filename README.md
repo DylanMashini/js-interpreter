@@ -3,7 +3,7 @@
 A  simple JS interpreter written in Rust. Right now, some things don't behave the same way they do in ECMA-compliant runtimes like V8, but most JS syntax is supported. This is still unstable, and not suitable for usage in production, but there are applications for embedded computing in the future. 
 
 ## Project Structure
-- ``interpreter/``
+- ``src/``
   The Rust project for the interpreter. There are a few key files. I'll list them in the order that they run within the interpreter.
   
   ``lexer.rs`` is the first step. The Lexer struct takes in a String for the source code, and outputs Vec<Token>. The Token struct and TokenValue enum are also defined in this file.
