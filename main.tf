@@ -122,7 +122,7 @@ resource "aws_s3_bucket_cors_configuration" "interpreter_demo_files" {
 resource "aws_s3_object" "demo_files" {
   for_each     = fileset("./frontend/build", "**/*")
   bucket = aws_s3_bucket.interpreter_demo_files.id
-  key = each.value
+  key = split(".html", each.value)[0]
     content_type = lookup(local.content_type_map, split(".", each.value)[length(split(".", each.value)) - 1], "text/html")
     etag = filemd5(format("%s%s", "./frontend/build/", each.value))
     source = format("%s%s", "./frontend/build/", each.value)
@@ -186,7 +186,7 @@ resource "aws_cloudfront_distribution" "s3_files_distribution" {
     }
     enabled = true
     is_ipv6_enabled = true
-    default_root_object = "index.html"
+    default_root_object = "index"
 
     default_cache_behavior {
         # Optimized Default
