@@ -17,4 +17,8 @@ A  simple JS interpreter written in Rust. Right now, some things don't behave th
   ``string.rs``, ``console.rs``, ``array.rs``, and ``math.rs`` define behavior for features inside of the runtime. They all work by exporting a function that returns a prototype for the specific feature. This pattern was the best way for me to write primitive features into the interpreter. 
 
 - ``frontend/``
-  A Svelte frontend that utilizes the interpreter compiled into WASM. This is just a quick way to try out the interpreter in a browser. 
+  A Svelte frontend that utilizes the interpreter compiled into WASM. This is just a quick way to try out the interpreter in a browser.
+
+- ``main.tf``
+  Terraform file that deploys the project to interpreter.dylanmashini.com using AWS S3 + CloudFront. 
+
